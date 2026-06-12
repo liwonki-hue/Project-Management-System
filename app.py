@@ -12,7 +12,7 @@ def index():
 
 @app.route('/api/activities')
 def get_activities():
-    data = db.select('activities', order='unit_no.asc,activity_id.asc')
+    data = db.select('activities', order='activity_id.asc')
     return jsonify(data)
 
 
