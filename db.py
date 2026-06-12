@@ -27,17 +27,15 @@ def select(table, columns="*", order=None, **eq_filters):
     return r.json()
 
 
-def upsert(table, data, on_conflict):
+def patch(table, data, **eq_filters):
     h = {
         **_HEADERS,
         "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates,return=representation",
+        "Prefer": "return=representation",
     }
-    r = requests.post(
-        f"{_BASE}/{table}",
-        headers=h,
-        params={"on_conflict": on_conflict},
-        json=data,
-    )
+    params = {k: f"eq.{v}" for k, v in eq_filters.items()}
+    r = requests.patch(f"{_BASE}/{table}", headers=h, params=params, json=data)
     r.raise_for_status()
     return r.json()
+
+

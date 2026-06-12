@@ -1,102 +1,108 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PMS Dashboard</title>
+  <title>TRUKISTAN CCGT PMS</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
 <header>
-  <h1>📊 PMS Dashboard</h1>
+  <h1>TRUKISTAN CCGT PROJECT MANAGEMENT SCHEDULE</h1>
   <span id="last-updated"></span>
 </header>
 
+<!-- KPI -->
+<div class="kpi-row">
+  <div class="kpi-card c1">
+    <div class="kpi-value" id="kpi-total">-</div>
+    <div class="kpi-label">Total</div>
+  </div>
+  <div class="kpi-card c2">
+    <div class="kpi-value" id="kpi-in-progress">-</div>
+    <div class="kpi-label">In Progress</div>
+  </div>
+  <div class="kpi-card c3">
+    <div class="kpi-value" id="kpi-complete">-</div>
+    <div class="kpi-label">Completed</div>
+  </div>
+  <div class="kpi-card c4">
+    <div class="kpi-value" id="kpi-remaining">-</div>
+    <div class="kpi-label">Remaining</div>
+  </div>
+  <div class="kpi-card c5">
+    <div class="kpi-value" id="kpi-this-week">-</div>
+    <div class="kpi-label">This Week</div>
+  </div>
+  <div class="kpi-card c6">
+    <div class="kpi-value" id="kpi-not-started">-</div>
+    <div class="kpi-label">Not Started</div>
+  </div>
+</div>
+
+<!-- Filter bar -->
 <div class="filter-bar">
-  <div class="filter-group">
-    <label>Unit</label>
-    <button class="unit-btn active" data-unit="1CF">1CF</button>
-    <button class="unit-btn active" data-unit="2CF">2CF</button>
-    <button class="unit-btn active" data-unit="0CF">0CF</button>
+  <div class="filter-group search-group">
+    <input type="text" id="search" placeholder="Search by Activity ID or Activity Name...">
   </div>
   <div class="filter-group">
-    <label>단위</label>
-    <select id="unit-type-filter">
-      <option value="">전체</option>
-      <option value="D/I">D/I</option>
-      <option value="%">%</option>
+    <label>Block</label>
+    <select id="unit-filter">
+      <option value="">All</option>
     </select>
   </div>
   <div class="filter-group">
-    <input type="text" id="search" placeholder="Activity 검색...">
+    <label>Activity ID</label>
+    <select id="activity-id-filter">
+      <option value="">All</option>
+    </select>
   </div>
-  <button id="refresh-btn">🔄 새로고침</button>
-</div>
-
-<div class="kpi-row">
-  <div class="kpi-card">
-    <div class="kpi-value" id="kpi-total">-</div>
-    <div class="kpi-label">전체 Activity</div>
+  <div class="filter-group">
+    <label>Report Date</label>
+    <select id="date-filter">
+      <option value="">All Dates</option>
+    </select>
   </div>
-  <div class="kpi-card">
-    <div class="kpi-value" id="kpi-di-budget">-</div>
-    <div class="kpi-label">D/I 예산 합계</div>
+  <div class="filter-group">
+    <button id="search-btn" class="action-btn btn-search">Search</button>
   </div>
-  <div class="kpi-card">
-    <div class="kpi-value" id="kpi-pct-complete">-</div>
-    <div class="kpi-label">% 완료 Activity</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-value" id="kpi-this-week">-</div>
-    <div class="kpi-label">금주 실적 등록</div>
+  <div class="filter-group action-group">
+    <button id="save-btn" class="action-btn btn-save">&#128190; Save</button>
+    <button id="export-btn" class="action-btn btn-export">&#128202; Excel</button>
+    <button id="print-btn" class="action-btn btn-print">&#128438; Print</button>
   </div>
 </div>
 
-<div class="tabs">
-  <button class="tab-btn active" data-tab="table">📋 Activity 목록</button>
-  <button class="tab-btn" data-tab="charts">📈 차트</button>
-</div>
-
-<div id="tab-table" class="tab-content active">
-  <div id="loading" class="loading">데이터 로드 중...</div>
-  <table id="activity-table" style="display:none">
+<!-- Table -->
+<div id="loading" class="loading">Loading data...</div>
+<div id="table-wrap" style="display:none">
+  <table id="activity-table">
     <thead>
       <tr>
-        <th>Unit</th>
-        <th>Activity ID</th>
-        <th>Activity Name</th>
-        <th>예산 물량</th>
-        <th>단위</th>
-        <th>현황</th>
-        <th>전주</th>
-        <th>금주</th>
-        <th>누계</th>
-        <th>기준일</th>
+        <th class="col-block">Block</th>
+        <th class="col-id">Activity ID</th>
+        <th class="col-name">Activity Name</th>
+        <th class="col-date th-wrap">Actual<br>Start</th>
+        <th class="col-date th-wrap">Actual<br>Finish</th>
+        <th class="col-unit">Unit</th>
+        <th class="col-totalqty th-wrap">Total<br>Q'ty</th>
+        <th class="col-qty th-wrap">Previous<br>Week</th>
+        <th class="col-qty th-wrap">This<br>Week</th>
+        <th class="col-qty th-wrap">Completed<br>Q'ty</th>
+        <th class="col-qty th-wrap">Remaining<br>Qty</th>
+        <th class="col-prog">Progress</th>
+        <th class="col-remark">Remark</th>
+        <th class="col-staff th-wrap">Local<br>Staff</th>
+        <th class="col-staff th-wrap">Korean<br>Manager</th>
       </tr>
     </thead>
     <tbody id="table-body"></tbody>
   </table>
 </div>
 
-<div id="tab-charts" class="tab-content">
-  <div class="charts-grid">
-    <div class="chart-box">
-      <h3>Unit별 예산 물량</h3>
-      <canvas id="chart-budget"></canvas>
-    </div>
-    <div class="chart-box">
-      <h3>Activity 유형 분포</h3>
-      <canvas id="chart-type"></canvas>
-    </div>
-    <div class="chart-box" style="grid-column: 1 / -1;">
-      <h3>Unit별 Activity 수</h3>
-      <canvas id="chart-unit-count"></canvas>
-    </div>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<div id="pagination" class="pagination"></div>
 <script src="/static/js/app.js"></script>
 </body>
 </html>
