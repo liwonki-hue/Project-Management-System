@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+Raw File/
+insert_pms_data.sql
+.streamlit/secrets.toml
