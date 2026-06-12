@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PMS Dashboard</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<header>
+  <h1>📊 PMS Dashboard</h1>
+  <span id="last-updated"></span>
+</header>
+
+<div class="filter-bar">
+  <div class="filter-group">
+    <label>Unit</label>
+    <button class="unit-btn active" data-unit="1CF">1CF</button>
+    <button class="unit-btn active" data-unit="2CF">2CF</button>
+    <button class="unit-btn active" data-unit="0CF">0CF</button>
+  </div>
+  <div class="filter-group">
+    <label>단위</label>
+    <select id="unit-type-filter">
+      <option value="">전체</option>
+      <option value="D/I">D/I</option>
+      <option value="%">%</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <input type="text" id="search" placeholder="Activity 검색...">
+  </div>
+  <button id="refresh-btn">🔄 새로고침</button>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi-card">
+    <div class="kpi-value" id="kpi-total">-</div>
+    <div class="kpi-label">전체 Activity</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value" id="kpi-di-budget">-</div>
+    <div class="kpi-label">D/I 예산 합계</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value" id="kpi-pct-complete">-</div>
+    <div class="kpi-label">% 완료 Activity</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value" id="kpi-this-week">-</div>
+    <div class="kpi-label">금주 실적 등록</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="table">📋 Activity 목록</button>
+  <button class="tab-btn" data-tab="charts">📈 차트</button>
+</div>
+
+<div id="tab-table" class="tab-content active">
+  <div id="loading" class="loading">데이터 로드 중...</div>
+  <table id="activity-table" style="display:none">
+    <thead>
+      <tr>
+        <th>Unit</th>
+        <th>Activity ID</th>
+        <th>Activity Name</th>
+        <th>예산 물량</th>
+        <th>단위</th>
+        <th>현황</th>
+        <th>전주</th>
+        <th>금주</th>
+        <th>누계</th>
+        <th>기준일</th>
+      </tr>
+    </thead>
+    <tbody id="table-body"></tbody>
+  </table>
+</div>
+
+<div id="tab-charts" class="tab-content">
+  <div class="charts-grid">
+    <div class="chart-box">
+      <h3>Unit별 예산 물량</h3>
+      <canvas id="chart-budget"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3>Activity 유형 분포</h3>
+      <canvas id="chart-type"></canvas>
+    </div>
+    <div class="chart-box" style="grid-column: 1 / -1;">
+      <h3>Unit별 Activity 수</h3>
+      <canvas id="chart-unit-count"></canvas>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
