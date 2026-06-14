@@ -66,10 +66,14 @@ def save_batch():
         rdt = p.get('report_date')
         if rdt:
             patch_data = {k: v for k, v in p.items() if k not in ('activity_id', 'report_date')}
+            # NOT NULL 컬럼(prev_week_qty, this_week_qty)은 null 대신 0으로 초기화
+            for f in ('prev_week_qty', 'this_week_qty'):
+                if patch_data.get(f) is None:
+                    patch_data[f] = 0
             try:
                 db.patch('weekly_progress', patch_data, activity_id=aid, report_date=rdt)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f'[PATCH 실패] {aid}/{rdt}: {e}')
 
     return jsonify({'ok': True})
 
