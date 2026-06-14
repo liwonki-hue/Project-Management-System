@@ -25,18 +25,32 @@ def get_progress():
 @app.route('/api/save_batch', methods=['POST'])
 def save_batch():
     body = request.get_json()
+
+    # activities: 변경값이 있는 항목만 배치 upsert
+    act_records = []
     for u in body.get('activities', []):
         aid = u.get('activity_id')
-        if not aid: continue
+        if not aid:
+            continue
         data = {k: v for k, v in u.items() if k != 'activity_id' and v is not None}
         if data:
-            db.patch('activities', data, activity_id=aid)
+            act_records.append({'activity_id': aid, **data})
+    if act_records:
+        db.upsert('activities', act_records, on_conflict='activity_id')
+
+    # weekly_progress: 실제 데이터가 있는 항목만 배치 upsert (1회 요청)
+    qty_fields = ('actual_start', 'actual_finish', 'prev_week_qty', 'this_week_qty', 'actual_total_qty')
+    prog_records = []
     for u in body.get('progress', []):
         aid = u.get('activity_id')
-        if not aid: continue
+        if not aid:
+            continue
         data = {k: (v if v != '' else None) for k, v in u.items() if k != 'activity_id'}
-        if any(v is not None for v in data.values()):
-            db.patch('weekly_progress', data, activity_id=aid)
+        if any(data.get(f) is not None for f in qty_fields):
+            prog_records.append({'activity_id': aid, **data})
+    if prog_records:
+        db.upsert('weekly_progress', prog_records, on_conflict='activity_id,report_date')
+
     return jsonify({'ok': True})
 
 

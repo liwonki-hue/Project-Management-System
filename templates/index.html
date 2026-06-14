@@ -15,30 +15,59 @@
 </header>
 
 <!-- KPI -->
-<div class="kpi-row">
-  <div class="kpi-card c1">
-    <div class="kpi-value" id="kpi-total">-</div>
-    <div class="kpi-label">Total</div>
+<div class="kpi-area">
+  <div class="kpi-group-wrap">
+    <div class="kpi-group-label">Weight</div>
+    <div class="kpi-group">
+      <div class="kpi-card c1">
+        <div class="kpi-value" id="kpi-weight">-</div>
+        <div class="kpi-label">Weight</div>
+      </div>
+      <div class="kpi-card c8">
+        <div class="kpi-value" id="kpi-pw-wf">-</div>
+        <div class="kpi-label">Previous Week</div>
+      </div>
+      <div class="kpi-card c5">
+        <div class="kpi-value" id="kpi-tw-wf">-</div>
+        <div class="kpi-label">This Week</div>
+      </div>
+    </div>
   </div>
-  <div class="kpi-card c2">
-    <div class="kpi-value" id="kpi-in-progress">-</div>
-    <div class="kpi-label">In Progress</div>
+  <div class="kpi-divider"></div>
+  <div class="kpi-group-wrap">
+    <div class="kpi-group-label">Progress</div>
+    <div class="kpi-group">
+      <div class="kpi-card c2">
+        <div class="kpi-value" id="kpi-progress">-</div>
+        <div class="kpi-label">Progress</div>
+      </div>
+      <div class="kpi-card c3">
+        <div class="kpi-value" id="kpi-prev-week">-</div>
+        <div class="kpi-label">Previous Week</div>
+      </div>
+      <div class="kpi-card c4">
+        <div class="kpi-value" id="kpi-this-week">-</div>
+        <div class="kpi-label">This Week</div>
+      </div>
+    </div>
   </div>
-  <div class="kpi-card c3">
-    <div class="kpi-value" id="kpi-complete">-</div>
-    <div class="kpi-label">Completed</div>
-  </div>
-  <div class="kpi-card c4">
-    <div class="kpi-value" id="kpi-remaining">-</div>
-    <div class="kpi-label">Remaining</div>
-  </div>
-  <div class="kpi-card c5">
-    <div class="kpi-value" id="kpi-this-week">-</div>
-    <div class="kpi-label">This Week</div>
-  </div>
-  <div class="kpi-card c6">
-    <div class="kpi-value" id="kpi-not-started">-</div>
-    <div class="kpi-label">Not Started</div>
+  <div class="kpi-divider"></div>
+  <div class="kpi-group-wrap">
+    <div class="kpi-group-label">Activity</div>
+    <div class="kpi-group">
+      <div class="kpi-card c9 kpi-clickable" id="kpi-card-act-prev">
+        <div class="kpi-value" id="kpi-act-prev">-</div>
+        <div class="kpi-label">Previous</div>
+      </div>
+      <div class="kpi-card c7 kpi-clickable" id="kpi-card-act-this">
+        <div class="kpi-value" id="kpi-act-this">-</div>
+        <div class="kpi-label">This Week</div>
+      </div>
+      <div class="kpi-card c10 kpi-clickable" id="kpi-card-act-new">
+        <div class="kpi-value" id="kpi-act-new">-</div>
+        <div class="kpi-label">New</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -54,15 +83,24 @@
     </select>
   </div>
   <div class="filter-group">
+    <label>Discipline</label>
+    <select id="discipline-filter">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div class="filter-group">
     <label>Activity ID</label>
     <select id="activity-id-filter">
       <option value="">All</option>
     </select>
   </div>
   <div class="filter-group">
-    <label>Report Date</label>
-    <select id="date-filter">
-      <option value="">All Dates</option>
+    <label>Status</label>
+    <select id="status-filter">
+      <option value="">All</option>
+      <option value="not-start">Not Start</option>
+      <option value="ongoing">Ongoing</option>
+      <option value="completed">Completed</option>
     </select>
   </div>
   <div class="filter-group">
@@ -81,9 +119,13 @@
   <table id="activity-table">
     <thead>
       <tr>
+        <th class="col-seq">#</th>
+        <th class="col-level">LEVEL</th>
         <th class="col-block">Block</th>
+        <th class="col-discipline">Discipline</th>
         <th class="col-id">Activity ID</th>
         <th class="col-name">Activity Name</th>
+        <th class="col-weight th-wrap">Weight<br>Factor (%)</th>
         <th class="col-date th-wrap">Actual<br>Start</th>
         <th class="col-date th-wrap">Actual<br>Finish</th>
         <th class="col-unit">Unit</th>
@@ -93,9 +135,8 @@
         <th class="col-qty th-wrap">Completed<br>Q'ty</th>
         <th class="col-qty th-wrap">Remaining<br>Qty</th>
         <th class="col-prog">Progress</th>
+        <th class="col-status">Status</th>
         <th class="col-remark">Remark</th>
-        <th class="col-staff th-wrap">Local<br>Staff</th>
-        <th class="col-staff th-wrap">Korean<br>Manager</th>
       </tr>
     </thead>
     <tbody id="table-body"></tbody>
