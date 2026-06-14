@@ -1,14 +1,16 @@
 # JM(Joint Master) → PMS 피팅 데이터 동기화 스크립트
 import os
 import requests
+import openpyxl
 from datetime import date, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
 
-SUPA_URL = os.getenv("SUPABASE_URL")
-SUPA_KEY = os.getenv("SUPABASE_KEY")
-BASE     = f"{SUPA_URL}/rest/v1"
+SUPA_URL    = os.getenv("SUPABASE_URL")
+SUPA_KEY    = os.getenv("SUPABASE_KEY")
+BASE        = f"{SUPA_URL}/rest/v1"
+MAPPING_XLS = "JM_Mapping.xlsx"
 
 PMS_HEADERS = {
     "apikey": SUPA_KEY,
@@ -22,11 +24,21 @@ JM_HEADERS = {
     "Accept-Profile": "construction",
 }
 
-# PMS activity → JM 필터 매핑
-# (activity_id, jm_system, jm_unit)
-JM_MAPPING = [
-    ("0CF3010W58A11", "RW", "B0"),
-]
+
+def load_mapping() -> list:
+    """JM_Mapping.xlsx 'JM Mapping' 시트에서 Active='Y' 행만 읽기"""
+    wb = openpyxl.load_workbook(MAPPING_XLS, data_only=True)
+    ws = wb['JM Mapping']
+    mapping = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        activity_id, system, unit, desc, active = (row + (None,) * 5)[:5]
+        if not activity_id or not system or not unit:
+            continue
+        if str(active or '').strip().upper() != 'Y':
+            continue
+        mapping.append((str(activity_id).strip(), str(system).strip(), str(unit).strip()))
+    wb.close()
+    return mapping
 
 
 def week_bounds(d: date):
@@ -74,6 +86,12 @@ def upsert_pms(table: str, records: list, on_conflict: str):
 
 
 def sync():
+    mapping = load_mapping()
+    if not mapping:
+        print(f"[오류] {MAPPING_XLS}에 Active='Y' 항목이 없습니다.")
+        return
+    print(f"매핑 로드 : {len(mapping)}개 항목")
+
     report_date_str = get_latest_report_date()
     report_date     = date.fromisoformat(report_date_str)
 
@@ -86,7 +104,7 @@ def sync():
     print(f"Previous week    : {prev_mon} ~ {prev_sun}")
     print()
 
-    for activity_id, jm_system, jm_unit in JM_MAPPING:
+    for activity_id, jm_system, jm_unit in mapping:
         print(f"[{activity_id}]  system={jm_system}, unit={jm_unit}")
 
         joints = fetch_jm(jm_system, jm_unit)
