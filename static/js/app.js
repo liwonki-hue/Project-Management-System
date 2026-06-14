@@ -2,6 +2,7 @@
 let allActivities = [];
 let allProgress   = [];
 let progressMap   = {};
+let kpiState      = {};
 
 let searchText         = '';
 let selectedUnit       = '';
@@ -61,6 +62,7 @@ async function loadData() {
   }
 
   render();
+  renderOverview();
 
 }
 
@@ -198,18 +200,25 @@ function renderKPIs(data) {
   }
 
   const fmt2 = v => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmt1 = v => v.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  const fmt3 = v => v.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
-  const weightPct  = weightSum * 100;
-  const prevWeekWF = weightPct * prevWeekPct / 100;
-  const thisWeekWF = weightPct * thisWeekPct / 100;
+  const weightPct = weightSum * 100;
 
-  document.getElementById('kpi-weight').textContent    = fmt2(weightPct) + '%';
-  document.getElementById('kpi-pw-wf').textContent     = fmt2(prevWeekWF) + '%';
-  document.getElementById('kpi-tw-wf').textContent     = fmt2(thisWeekWF) + '%';
-  document.getElementById('kpi-progress').textContent  = fmt1(progressPct) + '%';
-  document.getElementById('kpi-prev-week').textContent = fmt1(prevWeekPct) + '%';
-  document.getElementById('kpi-this-week').textContent = fmt1(thisWeekPct) + '%';
+  const progressRatePct = weightPct > 0 ? progressPct / weightPct * 100 : 0;
+  const prevWeekRatePct = weightPct > 0 ? prevWeekPct / weightPct * 100 : 0;
+  const thisWeekRatePct = weightPct > 0 ? thisWeekPct / weightPct * 100 : 0;
+
+  kpiState = { weightPct, progressPct, prevWeekPct, thisWeekPct, progressRatePct, prevWeekRatePct, thisWeekRatePct };
+
+  document.getElementById('kpi-weight-lbl').textContent   = fmt2(weightPct) + '%';
+  document.getElementById('kpi-prog-lbl').textContent     = '100%';
+  document.getElementById('kpi-act-lbl').textContent      = allActivities.length.toLocaleString();
+  document.getElementById('kpi-pw-wf').textContent        = fmt3(prevWeekPct) + '%';
+  document.getElementById('kpi-tw-wf').textContent        = fmt3(thisWeekPct) + '%';
+  document.getElementById('kpi-wf-completed').textContent = fmt3(progressPct) + '%';
+  document.getElementById('kpi-progress').textContent  = fmt3(progressRatePct) + '%';
+  document.getElementById('kpi-prev-week').textContent = fmt3(prevWeekRatePct) + '%';
+  document.getElementById('kpi-this-week').textContent = fmt3(thisWeekRatePct) + '%';
   document.getElementById('kpi-act-prev').textContent = actPrevCount.toLocaleString();
   document.getElementById('kpi-act-this').textContent = actThisCount.toLocaleString();
   document.getElementById('kpi-act-new').textContent  = actNewCount.toLocaleString();
@@ -234,7 +243,7 @@ function renderTable(data, startIndex = 0) {
     const blockLabel = fmtBlock(act.unit_no);
     const cls        = `unit-${act.unit_no}`;
     const ut         = act.unit_type || '';
-    const unitOpts   = ['DI', '%'].map(v =>
+    const unitOpts   = ['DI', '%', 'EA'].map(v =>
       `<option value="${v}"${ut === v ? ' selected' : ''}>${v}</option>`
     ).join('');
 
@@ -260,14 +269,13 @@ function renderTable(data, startIndex = 0) {
       <td><input type="date" class="date-input${finishVal ? ' has-val' : ''}"
             data-id="${act.activity_id}" data-field="actual_finish" value="${finishVal}"></td>
       <td><select class="unit-select" data-id="${act.activity_id}"><option value=""></option>${unitOpts}</select></td>
-      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="budgeted_units" data-table="activities" value="${act.budgeted_units ?? ''}"></td>
-      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="prev_week_qty"  data-table="progress"    value="${prevWk  ?? ''}"></td>
-      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="this_week_qty"  data-table="progress"    value="${thisWk  ?? ''}"></td>
-      <td class="completed-cell">${fmtNum(completed, 1)}</td>
+      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="budgeted_units" data-table="activities" value="${act.budgeted_units != null ? Math.round(act.budgeted_units) : ''}"></td>
+      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="prev_week_qty"  data-table="progress"    value="${prevWk  != null ? Math.round(prevWk)  : ''}"></td>
+      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="this_week_qty"  data-table="progress"    value="${thisWk  != null ? Math.round(thisWk)  : ''}"></td>
+      <td class="completed-cell">${fmtNum(completed, 0)}</td>
       <td class="remaining-cell">-</td>
       <td class="progress-cell">${PROG_DASH}</td>
       <td class="status-cell"></td>
-      <td><input type="text" class="remark-input" data-id="${act.activity_id}" placeholder=""></td>
     `;
     tbody.appendChild(tr);
     recalcRow(tr);
@@ -285,7 +293,7 @@ function recalcRow(tr) {
   const pct       = (totalQty && totalQty > 0 && completed != null)
     ? Math.min(100, (completed / totalQty) * 100) : null;
 
-  const fmt = v => v != null ? v.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '-';
+  const fmt = v => v != null ? Math.round(v).toLocaleString() : '-';
   tr.querySelector('.completed-cell').textContent = fmt(completed);
   tr.querySelector('.remaining-cell').textContent = fmt(remaining);
   tr.querySelector('.progress-cell').innerHTML = pct != null
@@ -470,10 +478,12 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const actList  = Object.values(actMap).filter(a =>
     Object.entries(a).some(([k, v]) => k !== 'activity_id' && v !== null)
   );
-  const progList = Object.values(progMap).filter(p =>
-    p.prev_week_qty != null || p.this_week_qty != null ||
-    p.actual_start  != null || p.actual_finish != null
-  );
+  const progList = Object.values(progMap).filter(p => {
+    const hasData       = p.prev_week_qty != null || p.this_week_qty != null ||
+                          p.actual_start  != null || p.actual_finish != null;
+    const existsInDB    = !!progressMap[p.activity_id];
+    return hasData || existsInDB;
+  });
 
   try {
     await fetch('/api/save_batch', {
@@ -552,7 +562,6 @@ document.getElementById('export-btn').addEventListener('click', () => {
         remQ   != null ? remQ   : '',
         pct    != null ? pct.toFixed(1) + '%' : '',
         statusLabel,
-        '',  // Remark
       ];
     });
 
@@ -594,6 +603,214 @@ document.getElementById('print-btn').addEventListener('click', () => {
     currentPage = 1;
     render();
   });
+});
+
+// ── Overview ─────────────────────────────────────────────────
+let _chartWeight = null;
+let _chartProg   = null;
+let _chartDisc   = null;
+
+function renderOverview() {
+  const f2 = v => (v||0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const f3 = v => (v||0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+  // byDisc 먼저 계산 (차트 + 테이블 공용)
+  const byDisc = {};
+  for (const act of allActivities) {
+    const disc = act.department || '(None)';
+    const p    = progressMap[act.activity_id] || {};
+    const wf   = parseFloat(act.weight_factor || 0);
+    const tq   = (act.budgeted_units != null && parseFloat(act.budgeted_units) > 0)
+                  ? parseFloat(act.budgeted_units) : 100;
+    const pw   = parseFloat(p.prev_week_qty || 0);
+    const tw   = parseFloat(p.this_week_qty || 0);
+    const cq   = pw + tw;
+    if (!byDisc[disc]) byDisc[disc] = {wf:0,prog:0,prev:0,this_:0};
+    byDisc[disc].wf    += wf;
+    byDisc[disc].prog  += wf * Math.min(1, cq / tq);
+    byDisc[disc].prev  += wf * Math.min(1, pw / tq);
+    byDisc[disc].this_ += wf * Math.min(1, tw / tq);
+  }
+
+  // ── 1. Charts ─────────────────────────────────────────────
+  const prog      = kpiState.progressPct || 0;
+  const thisWk    = kpiState.thisWeekPct || 0;
+  const weightPct = kpiState.weightPct   || 0;
+  const prevAcc   = Math.max(0, prog - thisWk);
+
+  // Chart 1: Project Weight 기준 (합계 = weightPct = 14.52%)
+  const wRemain = Math.max(0, weightPct - prog);
+  if (_chartWeight) _chartWeight.destroy();
+  _chartWeight = new Chart(document.getElementById('chart-weight'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Completed', 'This Week', 'Remaining'],
+      datasets: [{ data: [+prevAcc.toFixed(3), +thisWk.toFixed(3), +wRemain.toFixed(3)],
+        backgroundColor: ['#3b82f6','#22c55e','#e5e7eb'], borderWidth: 0 }]
+    },
+    options: { cutout: '72%', plugins: { legend:{display:false}, tooltip:{callbacks:{label: c=>`${c.label}: ${c.formattedValue}%`}} } }
+  });
+  document.getElementById('ov-wf-center').textContent = f3(prog) + '%';
+
+  // Chart 2: Progress 기준 (합계 = 100%) — completion rate scale
+  const progressRatePct = weightPct > 0 ? prog / weightPct * 100 : 0;
+  const thisWeekRatePct = weightPct > 0 ? thisWk / weightPct * 100 : 0;
+  const prevAccRate     = Math.max(0, progressRatePct - thisWeekRatePct);
+  const pRemain         = Math.max(0, 100 - progressRatePct);
+  if (_chartProg) _chartProg.destroy();
+  _chartProg = new Chart(document.getElementById('chart-progress'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Completed', 'This Week', 'Remaining'],
+      datasets: [{ data: [+prevAccRate.toFixed(3), +thisWeekRatePct.toFixed(3), +pRemain.toFixed(3)],
+        backgroundColor: ['#3b82f6','#22c55e','#e5e7eb'], borderWidth: 0 }]
+    },
+    options: { cutout: '72%', plugins: { legend:{display:false}, tooltip:{callbacks:{label: c=>`${c.label}: ${c.formattedValue}%`}} } }
+  });
+  document.getElementById('ov-prog-center').textContent = f3(progressRatePct) + '%';
+
+  // Discipline chart — 회색(Total Weight) 위에 파란색(Completed) 겹쳐서 표시
+  const discEntries  = Object.entries(byDisc).sort((a,b) => b[1].wf - a[1].wf);
+  const discLabels   = discEntries.map(([d]) => d);
+  const discTotalAbs = discEntries.map(([,g]) => +(g.wf * 100).toFixed(2));
+  const discComplAbs = discEntries.map(([,g]) => +(g.prog * 100).toFixed(3));
+  const maxWfPct     = Math.max(...discTotalAbs, 0.01);
+
+  if (_chartDisc) _chartDisc.destroy();
+  _chartDisc = new Chart(document.getElementById('chart-discipline'), {
+    type: 'bar',
+    plugins: [ChartDataLabels],
+    data: {
+      labels: discLabels,
+      datasets: [
+        { label: 'Total Weight (%)', data: discTotalAbs, backgroundColor: '#e2e8f0', barPercentage: 0.55, order: 1 },
+        { label: 'Completed (%)',    data: discComplAbs, backgroundColor: '#60a5fa', barPercentage: 0.55, order: 0 }
+      ]
+    },
+    options: {
+      grouped: false,
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { maxRotation: 40, font: { size: 10 } }, grid: { display: false } },
+        y: {
+          max: Math.ceil(maxWfPct * 1.15),
+          ticks: { callback: v => v.toFixed(1) + '%', font: { size: 10 } },
+          grid: { color: '#f0f0f0' }
+        }
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const g = discEntries[ctx.dataIndex]?.[1] ?? {};
+              return ctx.datasetIndex === 0
+                ? `Total Weight: ${(g.wf*100).toFixed(2)}%`
+                : `Completed: ${(g.prog*100).toFixed(3)}%`;
+            }
+          }
+        },
+        datalabels: {
+          display: ctx => ctx.datasetIndex === 0,
+          anchor: 'end',
+          align: 'top',
+          formatter: (_, ctx) => {
+            const v = discComplAbs[ctx.dataIndex] ?? 0;
+            return v > 0 ? v.toFixed(3) + '%' : '';
+          },
+          font: { size: 9, weight: '600' },
+          color: '#2563eb',
+          offset: 2
+        }
+      }
+    }
+  });
+
+  // ── 2. Discipline Summary ──────────────────────────────────
+  const discBody = document.getElementById('ov-disc-body');
+  discBody.innerHTML = '';
+  let tWf=0, tProg=0, tPrev=0, tThis=0;
+  for (const [disc, g] of discEntries) {
+    const progRate = g.wf > 0 ? g.prog/g.wf*100 : 0;
+    const prevRate = g.wf > 0 ? g.prev/g.wf*100 : 0;
+    const thisRate = g.wf > 0 ? g.this_/g.wf*100 : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${disc}</td>
+      <td>${f2(g.wf*100)}%</td><td>${f3(g.prog*100)}%</td><td>${f3(g.prev*100)}%</td><td>${f3(g.this_*100)}%</td>
+      <td>${f3(progRate)}%</td><td>${f3(prevRate)}%</td><td>${f3(thisRate)}%</td>`;
+    discBody.appendChild(tr);
+    tWf+=g.wf; tProg+=g.prog; tPrev+=g.prev; tThis+=g.this_;
+  }
+  const tf = document.createElement('tr');
+  tf.className = 'ov-total';
+  const tProgRate = tWf > 0 ? tProg/tWf*100 : 0;
+  const tPrevRate = tWf > 0 ? tPrev/tWf*100 : 0;
+  const tThisRate = tWf > 0 ? tThis/tWf*100 : 0;
+  tf.innerHTML = `<td>Total</td>
+    <td>${f2(tWf*100)}%</td><td>${f3(tProg*100)}%</td><td>${f3(tPrev*100)}%</td><td>${f3(tThis*100)}%</td>
+    <td>${f3(tProgRate)}%</td><td>${f3(tPrevRate)}%</td><td>${f3(tThisRate)}%</td>`;
+  discBody.appendChild(tf);
+
+  // ── 3. Activity Tables ─────────────────────────────────────
+  function buildActTable(tbodyId, filterFn) {
+    const tbody = document.getElementById(tbodyId);
+    tbody.innerHTML = '';
+    const list = allActivities
+      .filter(filterFn)
+      .sort((a,b) => parseFloat(progressMap[b.activity_id]?.this_week_qty||0)
+                   - parseFloat(progressMap[a.activity_id]?.this_week_qty||0))
+      .slice(0, 5);
+
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="10" style="color:#aaa;font-style:italic;text-align:center">No data</td></tr>`;
+      return;
+    }
+    for (const act of list) {
+      const p  = progressMap[act.activity_id] || {};
+      const tq = (act.budgeted_units != null && parseFloat(act.budgeted_units)>0) ? parseFloat(act.budgeted_units) : 100;
+      const pw = p.prev_week_qty != null ? parseFloat(p.prev_week_qty) : null;
+      const tw = p.this_week_qty != null ? parseFloat(p.this_week_qty) : null;
+      const cq = (pw||0) + (tw||0);
+      const pct = tq > 0 ? Math.min(100, cq/tq*100) : null;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${act.department||'-'}</td>
+        <td>${fmtBlock(act.unit_no)}</td>
+        <td class="ov-act-id">${act.activity_id||''}</td>
+        <td class="ov-act-name">${act.activity_name||'-'}</td>
+        <td>${toISODate(p.actual_start)||'-'}</td>
+        <td>${Math.round(tq).toLocaleString()}</td>
+        <td>${pw!=null ? Math.round(pw).toLocaleString() : '-'}</td>
+        <td>${tw!=null ? Math.round(tw).toLocaleString() : '-'}</td>
+        <td>${Math.round(cq).toLocaleString()}</td>
+        <td>${pct!=null ? pct.toFixed(1)+'%' : '-'}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  buildActTable('ov-key-body', act => {
+    const p = progressMap[act.activity_id] || {};
+    return p.this_week_qty != null && parseFloat(p.this_week_qty) > 0;
+  });
+  buildActTable('ov-new-body', act => {
+    const p = progressMap[act.activity_id] || {};
+    const tw = p.this_week_qty != null ? parseFloat(p.this_week_qty) : 0;
+    const pw = p.prev_week_qty != null ? parseFloat(p.prev_week_qty) : 0;
+    return tw > 0 && pw === 0;
+  });
+}
+
+// ── Tab switching ─────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.nav-item[data-tab="${tab}"]`)?.classList.add('active');
+  document.getElementById('tab-pms').style.display      = tab === 'pms'      ? '' : 'none';
+  document.getElementById('tab-overview').style.display = tab === 'overview' ? '' : 'none';
+  if (tab === 'overview') renderOverview();
+}
+
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
 // ── Init ────────────────────────────────────────────────────

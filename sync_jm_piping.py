@@ -10,7 +10,7 @@ load_dotenv()
 SUPA_URL    = os.getenv("SUPABASE_URL")
 SUPA_KEY    = os.getenv("SUPABASE_KEY")
 BASE        = f"{SUPA_URL}/rest/v1"
-MAPPING_XLS = "JM_Mapping.xlsx"
+MAPPING_XLS = "Raw File/JM_Mapping.xlsx"
 
 PMS_HEADERS = {
     "apikey": SUPA_KEY,
@@ -26,17 +26,43 @@ JM_HEADERS = {
 
 
 def load_mapping() -> list:
-    """JM_Mapping.xlsx 'JM Mapping' 시트에서 Active='Y' 행만 읽기"""
+    """JM_Mapping.xlsx 'JM Mapping' 시트에서 헤더명 기준으로 Active='Y' 행 읽기"""
     wb = openpyxl.load_workbook(MAPPING_XLS, data_only=True)
     ws = wb['JM Mapping']
+
+    # 헤더 행에서 컬럼 인덱스 확인
+    headers = [str(c.value or '').strip().lower() for c in next(ws.iter_rows(min_row=1, max_row=1))]
+    def col(name):
+        for n in [name, name.replace(' ', '_'), name.replace(' ', '')]:
+            try: return headers.index(n)
+            except ValueError: pass
+        return None
+
+    i_id     = col('activity id')
+    i_sys    = col('jm system')
+    i_unit   = col('jm unit')
+    i_ratio  = col('ratio')
+    i_active = col('active')
+
     mapping = []
     for row in ws.iter_rows(min_row=2, values_only=True):
-        activity_id, system, unit, desc, active = (row + (None,) * 5)[:5]
+        activity_id = str(row[i_id]   or '').strip() if i_id     is not None else ''
+        system      = str(row[i_sys]  or '').strip() if i_sys    is not None else ''
+        unit        = str(row[i_unit] or '').strip() if i_unit   is not None else ''
+        active      = str(row[i_active] or '').strip().upper() if i_active is not None else ''
+
         if not activity_id or not system or not unit:
             continue
-        if str(active or '').strip().upper() != 'Y':
+        if active != 'Y':
             continue
-        mapping.append((str(activity_id).strip(), str(system).strip(), str(unit).strip()))
+
+        ratio_val = row[i_ratio] if i_ratio is not None else None
+        try:
+            ratio = float(ratio_val) if ratio_val not in (None, '') else 1.0
+        except (ValueError, TypeError):
+            ratio = 1.0
+
+        mapping.append((activity_id, system, unit, ratio))
     wb.close()
     return mapping
 
@@ -49,13 +75,18 @@ def week_bounds(d: date):
 
 
 def fetch_jm(system: str, unit: str) -> list:
-    """joint_master에서 해당 system+unit 전체 데이터 조회 (최대 5000행)"""
+    """joint_master에서 해당 system+unit 전체 데이터 조회 (복수 시스템은 + 구분자 지원)"""
+    systems = [s.strip() for s in system.split('+')]
     params = {
         "select": "di,date_completed",
-        "system": f"eq.{system}",
         "unit":   f"eq.{unit}",
         "limit":  "5000",
     }
+    if len(systems) == 1:
+        params["system"] = f"eq.{systems[0]}"
+    else:
+        params["system"] = f"in.({','.join(systems)})"
+
     r = requests.get(f"{BASE}/joint_master", headers=JM_HEADERS, params=params, timeout=30)
     r.raise_for_status()
     return r.json()
@@ -104,13 +135,13 @@ def sync():
     print(f"Previous week    : {prev_mon} ~ {prev_sun}")
     print()
 
-    for activity_id, jm_system, jm_unit in mapping:
-        print(f"[{activity_id}]  system={jm_system}, unit={jm_unit}")
+    for activity_id, jm_system, jm_unit, ratio in mapping:
+        print(f"[{activity_id}]  system={jm_system}, unit={jm_unit}, ratio={ratio}")
 
         joints = fetch_jm(jm_system, jm_unit)
         print(f"  JM 조회 결과 : {len(joints)}행")
 
-        total_di = sum(float(j.get("di") or 0) for j in joints)
+        raw_total = sum(float(j.get("di") or 0) for j in joints)
 
         completed = [j for j in joints if j.get("date_completed")]
         start_date = (
@@ -118,23 +149,27 @@ def sync():
             if completed else None
         )
 
-        prev_di = sum(
+        raw_prev = sum(
             float(j.get("di") or 0) for j in completed
             if prev_mon.isoformat() <= j["date_completed"][:10] <= prev_sun.isoformat()
         )
-        this_di = sum(
+        raw_this = sum(
             float(j.get("di") or 0) for j in completed
             if this_mon.isoformat() <= j["date_completed"][:10] <= this_sun.isoformat()
         )
 
-        print(f"  Total DI     : {total_di:.1f}")
-        print(f"  Start date   : {start_date or '-'}")
-        print(f"  Prev week DI : {prev_di:.1f}")
-        print(f"  This week DI : {this_di:.1f}")
+        total_di = raw_total * ratio
+        prev_di  = raw_prev  * ratio
+        this_di  = raw_this  * ratio
 
-        # activities.budgeted_units 갱신
+        print(f"  Total DI (JM): {raw_total:.1f}  × {ratio} = {total_di:.1f}")
+        print(f"  Start date   : {start_date or '-'}")
+        print(f"  Prev week DI : {raw_prev:.1f}  × {ratio} = {prev_di:.1f}")
+        print(f"  This week DI : {raw_this:.1f}  × {ratio} = {this_di:.1f}")
+
+        # activities.budgeted_units + unit_type 갱신 (JM 매핑 항목은 항상 DI)
         upsert_pms("activities",
-                   [{"activity_id": activity_id, "budgeted_units": total_di}],
+                   [{"activity_id": activity_id, "budgeted_units": total_di, "unit_type": "DI"}],
                    on_conflict="activity_id")
         print(f"  activities.budgeted_units = {total_di:.1f} 저장 완료")
 

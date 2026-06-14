@@ -14,8 +14,8 @@ border = Border(left=thin, right=thin, top=thin, bottom=thin)
 ws = wb.active
 ws.title = 'JM Mapping'
 
-headers    = ['Activity ID', 'JM System', 'JM Unit', 'Description', 'Active']
-col_widths = [22, 14, 12, 45, 10]
+headers    = ['Activity ID', 'JM System', 'JM Unit', 'Description', 'Ratio', 'Active']
+col_widths = [22, 14, 12, 45, 10, 10]
 
 for ci, (h, w) in enumerate(zip(headers, col_widths), 1):
     cell = ws.cell(row=1, column=ci, value=h)
@@ -28,7 +28,8 @@ for ci, (h, w) in enumerate(zip(headers, col_widths), 1):
 ws.row_dimensions[1].height = 28
 
 examples = [
-    ('0CF3010W58A11', 'RW', 'B0', 'B0 Raw Water System Piping DI', 'Y'),
+    ('0CF3010W58A11', 'RW',  'B0', 'B0 Raw Water System Piping DI',          1.0, 'Y'),
+    ('0CF5534W36A13', 'FO',  'B0', '(DO Pump Station) FO System Piping DI',  0.6, 'Y'),
 ]
 for ri, row in enumerate(examples, 2):
     for ci, val in enumerate(row, 1):
@@ -43,7 +44,7 @@ for ri, row in enumerate(examples, 2):
     ws.row_dimensions[ri].height = 20
 
 for ri in range(len(examples) + 2, len(examples) + 32):
-    for ci in range(1, 6):
+    for ci in range(1, 7):
         cell = ws.cell(row=ri, column=ci)
         cell.border    = border
         cell.alignment = Alignment(
@@ -106,7 +107,8 @@ for ri, (code, desc) in enumerate(systems, 2):
         cell.alignment = Alignment(horizontal='center' if ci == 1 else 'left', vertical='center')
 
 units = [('B0', 'Block 0 (0CF)'), ('B1', 'Block 1 (1CF)'),
-         ('B2', 'Block 2 (2CF)'), ('E',  'E Block')]
+         ('B2', 'Block 2 (2CF)'), ('E',  'E Block'),
+         ('EA', 'Each (수량 단위)')]
 for ri, (code, desc) in enumerate(units, 2):
     for ci, val in enumerate((code, desc), 3):
         cell = ws2.cell(row=ri, column=ci, value=val)
