@@ -270,8 +270,8 @@ function renderTable(data, startIndex = 0) {
             data-id="${act.activity_id}" data-field="actual_finish" value="${finishVal}"></td>
       <td><select class="unit-select" data-id="${act.activity_id}"><option value=""></option>${unitOpts}</select></td>
       <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="budgeted_units" data-table="activities" value="${act.budgeted_units != null ? Math.round(act.budgeted_units) : ''}"></td>
-      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="prev_week_qty"  data-table="progress"    value="${prevWk  != null ? Math.round(prevWk)  : ''}"></td>
-      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="this_week_qty"  data-table="progress"    value="${thisWk  != null ? Math.round(thisWk)  : ''}"></td>
+      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="prev_week_qty"  data-table="progress"    value="${prevWk  != null && prevWk  > 0 ? Math.round(prevWk)  : ''}"></td>
+      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="this_week_qty"  data-table="progress"    value="${thisWk  != null && thisWk  > 0 ? Math.round(thisWk)  : ''}"></td>
       <td class="completed-cell">${fmtNum(completed, 0)}</td>
       <td class="remaining-cell">-</td>
       <td class="progress-cell">${PROG_DASH}</td>
@@ -461,6 +461,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     const finishInp = tr.querySelector('[data-field="actual_finish"]');
     if (!progMap[id]) progMap[id] = { activity_id: id };
     progMap[id].report_date   = progressMap[id]?.report_date || reportDate;
+    progMap[id].exists_in_db  = !!progressMap[id];
     progMap[id].actual_start  = startInp?.value  || null;
     progMap[id].actual_finish = finishInp?.value || null;
 

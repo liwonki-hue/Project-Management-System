@@ -38,22 +38,26 @@ def save_batch():
     if act_records:
         db.upsert('activities', act_records, on_conflict='activity_id')
 
-    # weekly_progress: 값 있으면 upsert, 값 비우면 PATCH(null 명시 UPDATE)
-    # merge-duplicates upsert는 null로 기존 값을 덮어쓰지 않으므로 분리 처리
-    qty_fields = ('actual_start', 'actual_finish', 'prev_week_qty', 'this_week_qty', 'actual_total_qty')
+    # weekly_progress: 기존 레코드는 PATCH(null 포함 전체 덮어씀), 신규만 upsert
+    # merge-duplicates는 null을 무시하므로 기존 레코드의 값 삭제가 불가능 — PATCH로 처리
     upsert_records = []
     patch_records  = []
     for u in body.get('progress', []):
         aid = u.get('activity_id')
         if not aid:
             continue
-        data = {k: (v if v != '' else None) for k, v in u.items() if k != 'activity_id'}
+        exists_in_db = bool(u.get('exists_in_db'))
+        data = {k: (v if v != '' else None) for k, v in u.items()
+                if k not in ('activity_id', 'exists_in_db')}
         if not data.get('report_date'):
             continue
-        if any(data.get(f) is not None for f in qty_fields):
-            upsert_records.append({'activity_id': aid, **data})
-        else:
+        if exists_in_db:
             patch_records.append({'activity_id': aid, **data})
+        else:
+            has_data = any(data.get(f) is not None
+                          for f in ('actual_start', 'actual_finish', 'prev_week_qty', 'this_week_qty'))
+            if has_data:
+                upsert_records.append({'activity_id': aid, **data})
 
     if upsert_records:
         db.upsert('weekly_progress', upsert_records, on_conflict='activity_id,report_date')
@@ -65,7 +69,7 @@ def save_batch():
             try:
                 db.patch('weekly_progress', patch_data, activity_id=aid, report_date=rdt)
             except Exception:
-                pass  # 기존 레코드 없으면 무시
+                pass
 
     return jsonify({'ok': True})
 
