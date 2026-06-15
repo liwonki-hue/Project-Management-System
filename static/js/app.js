@@ -14,6 +14,14 @@ let selectedKpiAct     = '';   // '' | 'prev' | 'this' | 'new'
 const PAGE_SIZE = 20;
 let currentPage = 1;
 
+const PROG_FIELDS = ['actual_start', 'actual_finish', 'prev_week_qty', 'this_week_qty'];
+
+function valChanged(cur, orig) {
+  const a = (cur == null || cur === '') ? null : String(cur);
+  const b = (orig == null || orig === '') ? null : String(orig);
+  return a !== b;
+}
+
 const UNIT_LABEL = { '0CF': 'B0', '1CF': 'B1', '2CF': 'B2' };
 function fmtBlock(unit_no) { return UNIT_LABEL[unit_no] || unit_no || '-'; }
 
@@ -381,6 +389,8 @@ document.getElementById('table-body').addEventListener('change', async e => {
     const activityId = input.dataset.id;
     const field      = input.dataset.field;
     const value      = input.value || null;
+    const prev       = progressMap[activityId]?.[field] || null;
+    if (!valChanged(value, prev)) return;
     input.classList.toggle('has-val', !!value);
     if (progressMap[activityId]) progressMap[activityId][field] = value;
     try {
@@ -475,15 +485,21 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     });
   });
 
-  // 실제 변경값이 있는 항목만 전송
-  const actList  = Object.values(actMap).filter(a =>
-    Object.entries(a).some(([k, v]) => k !== 'activity_id' && v !== null)
-  );
+  // DB 원본값과 다른 항목만 전송
+  const actLookup = Object.fromEntries(allActivities.map(a => [a.activity_id, a]));
+  const actList = Object.values(actMap).filter(a => {
+    const orig = actLookup[a.activity_id] || {};
+    return Object.entries(a).some(([k, v]) =>
+      k !== 'activity_id' && valChanged(v, orig[k])
+    );
+  });
+
   const progList = Object.values(progMap).filter(p => {
-    const hasData       = p.prev_week_qty != null || p.this_week_qty != null ||
-                          p.actual_start  != null || p.actual_finish != null;
-    const existsInDB    = !!progressMap[p.activity_id];
-    return hasData || existsInDB;
+    const orig = progressMap[p.activity_id];
+    if (!orig) {
+      return PROG_FIELDS.some(f => p[f] != null);
+    }
+    return PROG_FIELDS.some(f => valChanged(p[f], orig[f]));
   });
 
   try {
@@ -497,7 +513,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     Object.values(progMap).forEach(p => {
       const id = p.activity_id;
       if (!progressMap[id]) progressMap[id] = { activity_id: id };
-      Object.assign(progressMap[id], p);
+      const { exists_in_db, ...rest } = p;
+      Object.assign(progressMap[id], rest);
     });
     Object.values(actMap).forEach(a => {
       const act = allActivities.find(x => x.activity_id === a.activity_id);
