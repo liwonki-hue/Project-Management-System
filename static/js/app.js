@@ -6,6 +6,7 @@ let kpiState      = {};
 
 let searchText         = '';
 let selectedUnit       = '';
+let selectedArea       = '';
 let selectedDiscipline = '';
 let selectedActivity   = '';
 let selectedStatus     = '';   // '' | 'not-start' | 'ongoing' | 'completed'
@@ -105,7 +106,22 @@ function populateDropdowns() {
     discSel.appendChild(o);
   });
 
+  updateAreaDropdown(allActivities);
   updateActivityIdDropdown(allActivities);
+}
+
+function updateAreaDropdown(activities) {
+  const areaSel = document.getElementById('area-filter');
+  const prev    = areaSel.value;
+  const areas   = [...new Set(activities.map(a => a.area_system).filter(Boolean))].sort();
+  areaSel.innerHTML = '<option value="">All</option>';
+  areas.forEach(a => {
+    const o = document.createElement('option');
+    o.value = a; o.textContent = a;
+    areaSel.appendChild(o);
+  });
+  areaSel.value = areas.includes(prev) ? prev : '';
+  if (areaSel.value !== prev) selectedArea = '';
 }
 
 function updateActivityIdDropdown(activities) {
@@ -124,9 +140,10 @@ function updateActivityIdDropdown(activities) {
 // ── Filter ──────────────────────────────────────────────────
 function getFiltered() {
   return allActivities.filter(act => {
-    if (selectedUnit       && act.unit_no    !== selectedUnit)       return false;
-    if (selectedDiscipline && act.department !== selectedDiscipline) return false;
-    if (selectedActivity   && act.activity_id !== selectedActivity)  return false;
+    if (selectedUnit       && act.unit_no    !== selectedUnit)           return false;
+    if (selectedArea       && (act.area_system || '') !== selectedArea)  return false;
+    if (selectedDiscipline && act.department !== selectedDiscipline)     return false;
+    if (selectedActivity   && act.activity_id !== selectedActivity)      return false;
     if (searchText) {
       const q = searchText.toLowerCase();
       const inId   = (act.activity_id   || '').toLowerCase().includes(q);
@@ -351,10 +368,21 @@ document.getElementById('search').addEventListener('keydown', e => {
 });
 document.getElementById('unit-filter').addEventListener('change', e => {
   selectedUnit = e.target.value;
+  selectedArea = '';
+  currentPage = 1;
+  const byBlock = allActivities.filter(a => !selectedUnit || a.unit_no === selectedUnit);
+  updateAreaDropdown(byBlock);
+  const filtered = byBlock.filter(a => !selectedDiscipline || a.department === selectedDiscipline);
+  updateActivityIdDropdown(filtered);
+  render();
+});
+document.getElementById('area-filter').addEventListener('change', e => {
+  selectedArea = e.target.value;
   currentPage = 1;
   const filtered = allActivities.filter(a =>
-    (!selectedUnit       || a.unit_no    === selectedUnit) &&
-    (!selectedDiscipline || a.department === selectedDiscipline)
+    (!selectedUnit       || a.unit_no      === selectedUnit) &&
+    (!selectedArea       || (a.area_system || '') === selectedArea) &&
+    (!selectedDiscipline || a.department   === selectedDiscipline)
   );
   updateActivityIdDropdown(filtered);
   render();
@@ -363,8 +391,9 @@ document.getElementById('discipline-filter').addEventListener('change', e => {
   selectedDiscipline = e.target.value;
   currentPage = 1;
   const filtered = allActivities.filter(a =>
-    (!selectedUnit       || a.unit_no    === selectedUnit) &&
-    (!selectedDiscipline || a.department === selectedDiscipline)
+    (!selectedUnit       || a.unit_no      === selectedUnit) &&
+    (!selectedArea       || (a.area_system || '') === selectedArea) &&
+    (!selectedDiscipline || a.department   === selectedDiscipline)
   );
   updateActivityIdDropdown(filtered);
   render();
