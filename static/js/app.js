@@ -269,6 +269,7 @@ function renderTable(data, startIndex = 0) {
       <td>${level}</td>
       <td><span class="unit-badge ${cls}">${blockLabel}</span></td>
       <td>${act.department || '-'}</td>
+      <td><input type="text" class="qty-input area-input" data-id="${act.activity_id}" data-field="area_system" data-table="activities" value="${act.area_system || ''}"></td>
       <td class="td-id">${act.activity_id || '-'}</td>
       <td class="td-name">${act.activity_name || '-'}</td>
       <td class="td-weight">${wf}</td>
@@ -404,10 +405,11 @@ document.getElementById('table-body').addEventListener('change', async e => {
     } catch (err) { console.error('날짜 저장 실패:', err); }
     return;
   }
-  if (e.target.classList.contains('qty-input')) {
+  if (e.target.classList.contains('qty-input') && !e.target.classList.contains('area-input')) {
     recalcRow(e.target.closest('tr'));
     return;
   }
+  if (e.target.classList.contains('area-input')) return;
   if (!e.target.classList.contains('unit-select')) return;
   const sel        = e.target;
   const tr         = sel.closest('tr');
@@ -567,6 +569,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
         act.wbs_level ?? 9,
         fmtBlock(act.unit_no),
         act.department || '',
+        act.area_system || '',
         act.activity_id   || '',
         act.activity_name || '',
         wf != null ? (wf * 100).toFixed(4) : '',
@@ -585,7 +588,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    ws['!cols'] = headers.map((_, i) => ({ wch: i === 4 ? 42 : i === 5 ? 32 : 14 }));
+    ws['!cols'] = headers.map((_, i) => ({ wch: i === 6 ? 42 : i === 5 ? 20 : i === 4 ? 15 : 14 }));
     XLSX.utils.book_append_sheet(wb, ws, 'PMS Schedule');
     XLSX.writeFile(wb, `PMS_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 

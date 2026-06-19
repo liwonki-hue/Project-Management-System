@@ -92,21 +92,6 @@ def fetch_jm(system: str, unit: str) -> list:
     return r.json()
 
 
-def get_latest_report_date() -> str:
-    """PMS weekly_progress의 최신 report_date 조회"""
-    r = requests.get(
-        f"{BASE}/weekly_progress",
-        headers=PMS_HEADERS,
-        params={"select": "report_date", "order": "report_date.desc", "limit": "1"},
-        timeout=30,
-    )
-    r.raise_for_status()
-    rows = r.json()
-    if rows:
-        return rows[0]["report_date"]
-    return date.today().isoformat()
-
-
 def upsert_pms(table: str, records: list, on_conflict: str):
     h = {**PMS_HEADERS, "Content-Type": "application/json",
          "Prefer": "resolution=merge-duplicates,return=representation"}
@@ -123,8 +108,8 @@ def sync():
         return
     print(f"매핑 로드 : {len(mapping)}개 항목")
 
-    report_date_str = get_latest_report_date()
-    report_date     = date.fromisoformat(report_date_str)
+    report_date     = date.today()
+    report_date_str = report_date.isoformat()
 
     this_mon, this_sun = week_bounds(report_date)
     prev_mon = this_mon - timedelta(weeks=1)
@@ -149,9 +134,11 @@ def sync():
             if completed else None
         )
 
+        # prev: 지난주 말(prev_sun)까지 누적 완료 물량 (cumulative)
+        # this: 이번주에 완료된 물량만 (this week only)
         raw_prev = sum(
             float(j.get("di") or 0) for j in completed
-            if prev_mon.isoformat() <= j["date_completed"][:10] <= prev_sun.isoformat()
+            if j["date_completed"][:10] <= prev_sun.isoformat()
         )
         raw_this = sum(
             float(j.get("di") or 0) for j in completed
@@ -162,10 +149,10 @@ def sync():
         prev_di  = raw_prev  * ratio
         this_di  = raw_this  * ratio
 
-        print(f"  Total DI (JM): {raw_total:.1f}  × {ratio} = {total_di:.1f}")
+        print(f"  Total DI (JM): {raw_total:.1f}  x {ratio} = {total_di:.1f}")
         print(f"  Start date   : {start_date or '-'}")
-        print(f"  Prev week DI : {raw_prev:.1f}  × {ratio} = {prev_di:.1f}")
-        print(f"  This week DI : {raw_this:.1f}  × {ratio} = {this_di:.1f}")
+        print(f"  Prev week DI (cumul): {raw_prev:.1f}  x {ratio} = {prev_di:.1f}")
+        print(f"  This week DI : {raw_this:.1f}  x {ratio} = {this_di:.1f}")
 
         # activities.budgeted_units + unit_type 갱신 (JM 매핑 항목은 항상 DI)
         upsert_pms("activities",
