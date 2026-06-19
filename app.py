@@ -1,9 +1,11 @@
 # PMS Dashboard Flask 서버 — API 라우트 + 정적 파일 서빙
 from flask import Flask, jsonify, render_template, request
+from flask_compress import Compress
 from concurrent.futures import ThreadPoolExecutor
 import db
 
 app = Flask(__name__)
+Compress(app)
 
 
 def _patch_progress(p):
