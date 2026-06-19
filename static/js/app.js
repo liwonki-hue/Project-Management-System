@@ -12,6 +12,10 @@ let selectedActivity   = '';
 let selectedStatus     = '';   // '' | 'not-start' | 'ongoing' | 'completed'
 let selectedKpiAct     = '';   // '' | 'prev' | 'this' | 'new'
 
+let activeTab  = 'overview';
+let reportMode = false;
+const DISC_TABS = { mech: 'MECH', piping: 'PIPING', hvac: 'HVAC', ff: 'FF' };
+
 const PAGE_SIZE = 20;
 let currentPage = 1;
 
@@ -171,7 +175,7 @@ function render() {
   const pageData   = data.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   renderKPIs(allActivities);
-  renderTable(pageData, (currentPage - 1) * PAGE_SIZE);
+  renderTable(pageData, (currentPage - 1) * PAGE_SIZE, reportMode);
   renderPagination(data.length, totalPages);
 }
 
@@ -252,7 +256,7 @@ function renderKPIs(data) {
 // ── Table ───────────────────────────────────────────────────
 const PROG_DASH = '<span class="prog-dash">-</span>';
 
-function renderTable(data, startIndex = 0) {
+function renderTable(data, startIndex = 0, readOnly = false) {
   const tbody = document.getElementById('table-body');
   tbody.innerHTML = '';
 
@@ -279,6 +283,29 @@ function renderTable(data, startIndex = 0) {
       : '-';
     const level = act.wbs_level ?? 9;
 
+    const ro = readOnly;
+    const areaCell = ro
+      ? `<td style="text-align:center">${act.area_system || '-'}</td>`
+      : `<td><input type="text" class="qty-input area-input" data-id="${act.activity_id}" data-field="area_system" data-table="activities" value="${act.area_system || ''}"></td>`;
+    const startCell = ro
+      ? `<td>${startVal || '-'}</td>`
+      : `<td><input type="date" class="date-input${startVal ? ' has-val' : ''}" data-id="${act.activity_id}" data-field="actual_start" value="${startVal}"></td>`;
+    const finishCell = ro
+      ? `<td>${finishVal || '-'}</td>`
+      : `<td><input type="date" class="date-input${finishVal ? ' has-val' : ''}" data-id="${act.activity_id}" data-field="actual_finish" value="${finishVal}"></td>`;
+    const unitCell = ro
+      ? `<td>${ut || '-'}</td>`
+      : `<td><select class="unit-select" data-id="${act.activity_id}"><option value=""></option>${unitOpts}</select></td>`;
+    const totalCell = ro
+      ? `<td>${act.budgeted_units != null ? Math.round(act.budgeted_units).toLocaleString() : '-'}</td>`
+      : `<td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="budgeted_units" data-table="activities" value="${act.budgeted_units != null ? Math.round(act.budgeted_units) : ''}"></td>`;
+    const prevCell = ro
+      ? `<td>${prevWk != null && prevWk > 0 ? Math.round(prevWk).toLocaleString() : '-'}</td>`
+      : `<td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="prev_week_qty" data-table="progress" value="${prevWk != null && prevWk > 0 ? Math.round(prevWk) : ''}"></td>`;
+    const thisCell = ro
+      ? `<td>${thisWk != null && thisWk > 0 ? Math.round(thisWk).toLocaleString() : '-'}</td>`
+      : `<td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="this_week_qty" data-table="progress" value="${thisWk != null && thisWk > 0 ? Math.round(thisWk) : ''}"></td>`;
+
     const tr = document.createElement('tr');
     tr.dataset.id = act.activity_id;
     tr.innerHTML = `
@@ -286,18 +313,16 @@ function renderTable(data, startIndex = 0) {
       <td>${level}</td>
       <td><span class="unit-badge ${cls}">${blockLabel}</span></td>
       <td>${act.department || '-'}</td>
-      <td><input type="text" class="qty-input area-input" data-id="${act.activity_id}" data-field="area_system" data-table="activities" value="${act.area_system || ''}"></td>
+      ${areaCell}
       <td class="td-id">${act.activity_id || '-'}</td>
       <td class="td-name">${act.activity_name || '-'}</td>
       <td class="td-weight">${wf}</td>
-      <td><input type="date" class="date-input${startVal ? ' has-val' : ''}"
-            data-id="${act.activity_id}" data-field="actual_start" value="${startVal}"></td>
-      <td><input type="date" class="date-input${finishVal ? ' has-val' : ''}"
-            data-id="${act.activity_id}" data-field="actual_finish" value="${finishVal}"></td>
-      <td><select class="unit-select" data-id="${act.activity_id}"><option value=""></option>${unitOpts}</select></td>
-      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="budgeted_units" data-table="activities" value="${act.budgeted_units != null ? Math.round(act.budgeted_units) : ''}"></td>
-      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="prev_week_qty"  data-table="progress"    value="${prevWk  != null && prevWk  > 0 ? Math.round(prevWk)  : ''}"></td>
-      <td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="this_week_qty"  data-table="progress"    value="${thisWk  != null && thisWk  > 0 ? Math.round(thisWk)  : ''}"></td>
+      ${startCell}
+      ${finishCell}
+      ${unitCell}
+      ${totalCell}
+      ${prevCell}
+      ${thisCell}
       <td class="completed-cell">${fmtNum(completed, 0)}</td>
       <td class="remaining-cell">-</td>
       <td class="progress-cell">${PROG_DASH}</td>
@@ -632,7 +657,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
 // ── Print ────────────────────────────────────────────────────
 document.getElementById('print-btn').addEventListener('click', () => {
-  renderTable(getFiltered(), 0);
+  renderTable(getFiltered(), 0, reportMode);
   setTimeout(() => {
     window.print();
     setTimeout(() => render(), 500);
@@ -852,11 +877,34 @@ function renderOverview() {
 
 // ── Tab switching ─────────────────────────────────────────────
 function switchTab(tab) {
+  activeTab  = tab;
+  reportMode = (tab === 'report');
+  const isPmsTab = tab in DISC_TABS;
+
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.querySelector(`.nav-item[data-tab="${tab}"]`)?.classList.add('active');
-  document.getElementById('tab-pms').style.display      = tab === 'pms'      ? '' : 'none';
+
+  document.getElementById('tab-pms').style.display      = (isPmsTab || tab === 'report') ? '' : 'none';
   document.getElementById('tab-overview').style.display = tab === 'overview' ? '' : 'none';
-  if (tab === 'overview') renderOverview();
+
+  // Save 버튼: 리포트 탭에서는 숨김
+  document.getElementById('save-btn').style.display = reportMode ? 'none' : '';
+  // Discipline 필터: 디스ciplin 탭에서는 탭 자체가 필터이므로 숨김
+  document.getElementById('discipline-filter-group').style.display = isPmsTab ? 'none' : '';
+
+  if (isPmsTab) {
+    selectedDiscipline = DISC_TABS[tab];
+    currentPage = 1;
+    render();
+  } else if (tab === 'overview') {
+    selectedDiscipline = '';
+    renderOverview();
+  } else if (tab === 'report') {
+    selectedDiscipline = '';
+    document.getElementById('discipline-filter').value = '';
+    currentPage = 1;
+    render();
+  }
 }
 
 document.querySelectorAll('.nav-item').forEach(btn => {
