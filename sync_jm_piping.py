@@ -75,17 +75,15 @@ def week_bounds(d: date):
 
 
 def fetch_jm(system: str, unit: str) -> list:
-    """joint_master에서 해당 system+unit 전체 데이터 조회 (복수 시스템은 + 구분자 지원)"""
-    systems = [s.strip() for s in system.split('+')]
+    """joint_master에서 해당 system+unit 전체 데이터 조회 (복수 system/unit 모두 + 구분자 지원)"""
+    systems = [s.strip() for s in system.strip('()').split('+')]
+    units   = [u.strip() for u in unit.strip('()').split('+')]
     params = {
         "select": "di,date_completed",
-        "unit":   f"eq.{unit}",
         "limit":  "5000",
     }
-    if len(systems) == 1:
-        params["system"] = f"eq.{systems[0]}"
-    else:
-        params["system"] = f"in.({','.join(systems)})"
+    params["system"] = f"eq.{systems[0]}" if len(systems) == 1 else f"in.({','.join(systems)})"
+    params["unit"]   = f"eq.{units[0]}"   if len(units)   == 1 else f"in.({','.join(units)})"
 
     r = requests.get(f"{BASE}/joint_master", headers=JM_HEADERS, params=params, timeout=30)
     r.raise_for_status()

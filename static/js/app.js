@@ -768,12 +768,13 @@ function renderOverview() {
   });
   document.getElementById('ov-prog-center').textContent = f3(physProgress) + '%';
 
-  // Discipline chart — 회색(Total Weight) 위에 파란색(Completed) 겹쳐서 표시
-  const discEntries  = Object.entries(byDisc).sort((a,b) => b[1].wf - a[1].wf);
-  const discLabels   = discEntries.map(([d]) => d);
-  const discTotalAbs = discEntries.map(([,g]) => +(g.wf * 100).toFixed(2));
-  const discComplAbs = discEntries.map(([,g]) => +(g.prog * 100).toFixed(3));
-  const maxWfPct     = Math.max(...discTotalAbs, 0.01);
+  // Discipline chart — 파란색(Completed Progress), 녹색(This Week Progress)
+  const DISC_ORDER      = { 'MECH': 0, 'PIPING': 1, 'HVAC': 2, 'FF': 3 };
+  const discEntries     = Object.entries(byDisc).sort((a, b) => (DISC_ORDER[a[0]] ?? 99) - (DISC_ORDER[b[0]] ?? 99));
+  const discLabels      = discEntries.map(([d]) => d === 'MECH' ? 'BOP MECH' : d);
+  const discProgAbs     = discEntries.map(([,g]) => +(g.physN > 0 ? g.physProg/g.physN*100 : 0).toFixed(3));
+  const discThisProgAbs = discEntries.map(([,g]) => +(g.physN > 0 ? g.physThis/g.physN*100 : 0).toFixed(3));
+  const maxProgPct      = Math.max(...discProgAbs, 0.01);
 
   if (_chartDisc) _chartDisc.destroy();
   _chartDisc = new Chart(document.getElementById('chart-discipline'), {
@@ -782,17 +783,16 @@ function renderOverview() {
     data: {
       labels: discLabels,
       datasets: [
-        { label: 'Total Weight (%)', data: discTotalAbs, backgroundColor: '#e2e8f0', barPercentage: 0.55, order: 1 },
-        { label: 'Completed (%)',    data: discComplAbs, backgroundColor: '#60a5fa', barPercentage: 0.55, order: 0 }
+        { label: 'Completed (%)', data: discProgAbs,     backgroundColor: '#60a5fa', barPercentage: 0.6, categoryPercentage: 1.0, order: 0 },
+        { label: 'This Week (%)', data: discThisProgAbs, backgroundColor: '#22c55e', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 }
       ]
     },
     options: {
-      grouped: false,
       responsive: true, maintainAspectRatio: false,
       scales: {
         x: { ticks: { maxRotation: 40, font: { size: 10 } }, grid: { display: false } },
         y: {
-          max: Math.ceil(maxWfPct * 1.15),
+          max: Math.ceil(maxProgPct * 1.3),
           ticks: { callback: v => v.toFixed(1) + '%', font: { size: 10 } },
           grid: { color: '#f0f0f0' }
         }
@@ -803,22 +803,18 @@ function renderOverview() {
           callbacks: {
             label: ctx => {
               const g = discEntries[ctx.dataIndex]?.[1] ?? {};
-              return ctx.datasetIndex === 0
-                ? `Total Weight: ${(g.wf*100).toFixed(2)}%`
-                : `Completed: ${(g.prog*100).toFixed(3)}%`;
+              if (ctx.datasetIndex === 0) return `Progress: ${(g.physN > 0 ? g.physProg/g.physN*100 : 0).toFixed(3)}%`;
+              return `This Week: ${(g.physN > 0 ? g.physThis/g.physN*100 : 0).toFixed(3)}%`;
             }
           }
         },
         datalabels: {
-          display: ctx => ctx.datasetIndex === 0,
+          display: true,
           anchor: 'end',
           align: 'top',
-          formatter: (_, ctx) => {
-            const v = discComplAbs[ctx.dataIndex] ?? 0;
-            return v > 0 ? v.toFixed(3) + '%' : '';
-          },
+          formatter: (v) => v > 0 ? v.toFixed(3) + '%' : '',
           font: { size: 9, weight: '600' },
-          color: '#2563eb',
+          color: ctx => ctx.datasetIndex === 0 ? '#2563eb' : '#16a34a',
           offset: 2
         }
       }
@@ -834,7 +830,7 @@ function renderOverview() {
     const prevRate = g.physN > 0 ? g.physPrev/g.physN*100 : 0;
     const thisRate = g.physN > 0 ? g.physThis/g.physN*100 : 0;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${disc}</td>
+    tr.innerHTML = `<td>${disc === 'MECH' ? 'BOP MECH' : disc}</td>
       <td>${f2(g.wf*100)}%</td><td>${f3(g.prog*100)}%</td><td>${f3(g.prev*100)}%</td><td>${f3(g.this_*100)}%</td>
       <td>${f3(progRate)}%</td><td>${f3(prevRate)}%</td><td>${f3(thisRate)}%</td>`;
     discBody.appendChild(tr);
