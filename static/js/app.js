@@ -205,6 +205,10 @@ function renderKPIs(data) {
   let actPrevCount = 0;
   let actThisCount = 0;
   let actNewCount  = 0;
+  let physN        = 0;
+  let physProgSum  = 0;
+  let physPrevSum  = 0;
+  let physThisSum  = 0;
 
   for (const act of data) {
     const p       = progressMap[act.activity_id] || {};
@@ -214,14 +218,19 @@ function renderKPIs(data) {
       ? parseFloat(act.budgeted_units) : 100;
     const prevWk = p.prev_week_qty != null ? parseFloat(p.prev_week_qty) : 0;
     const thisWk = p.this_week_qty != null ? parseFloat(p.this_week_qty) : 0;
+    const compQ  = prevWk + thisWk;
 
     weightSum += wf;
     if (prevWk > 0) actPrevCount++;
     if (thisWk > 0) actThisCount++;
     if (thisWk > 0 && prevWk === 0) actNewCount++;
 
+    physN++;
+    physProgSum += Math.min(1, compQ  / totalQ);
+    physPrevSum += Math.min(1, prevWk / totalQ);
+    physThisSum += Math.min(1, thisWk / totalQ);
+
     if (wf > 0) {
-      const compQ = prevWk + thisWk;
       progressPct += wf * Math.min(1, compQ  / totalQ) * 100;
       prevWeekPct += wf * Math.min(1, prevWk / totalQ) * 100;
       thisWeekPct += wf * Math.min(1, thisWk / totalQ) * 100;
@@ -237,7 +246,11 @@ function renderKPIs(data) {
   const prevWeekRatePct = weightPct > 0 ? prevWeekPct / weightPct * 100 : 0;
   const thisWeekRatePct = weightPct > 0 ? thisWeekPct / weightPct * 100 : 0;
 
-  kpiState = { weightPct, progressPct, prevWeekPct, thisWeekPct, progressRatePct, prevWeekRatePct, thisWeekRatePct };
+  const physProgressPct = physN > 0 ? physProgSum / physN * 100 : 0;
+  const physPrevPct     = physN > 0 ? physPrevSum / physN * 100 : 0;
+  const physThisPct     = physN > 0 ? physThisSum / physN * 100 : 0;
+
+  kpiState = { weightPct, progressPct, prevWeekPct, thisWeekPct, progressRatePct, prevWeekRatePct, thisWeekRatePct, physProgressPct, physPrevPct, physThisPct };
 
   document.getElementById('kpi-weight-lbl').textContent   = fmt2(weightPct) + '%';
   document.getElementById('kpi-prog-lbl').textContent     = '100%';
@@ -245,9 +258,9 @@ function renderKPIs(data) {
   document.getElementById('kpi-pw-wf').textContent        = fmt3(prevWeekPct) + '%';
   document.getElementById('kpi-tw-wf').textContent        = fmt3(thisWeekPct) + '%';
   document.getElementById('kpi-wf-completed').textContent = fmt3(progressPct) + '%';
-  document.getElementById('kpi-progress').textContent  = fmt3(progressRatePct) + '%';
-  document.getElementById('kpi-prev-week').textContent = fmt3(prevWeekRatePct) + '%';
-  document.getElementById('kpi-this-week').textContent = fmt3(thisWeekRatePct) + '%';
+  document.getElementById('kpi-progress').textContent  = fmt3(physProgressPct) + '%';
+  document.getElementById('kpi-prev-week').textContent = fmt3(physPrevPct)     + '%';
+  document.getElementById('kpi-this-week').textContent = fmt3(physThisPct)     + '%';
   document.getElementById('kpi-act-prev').textContent = actPrevCount.toLocaleString();
   document.getElementById('kpi-act-this').textContent = actThisCount.toLocaleString();
   document.getElementById('kpi-act-new').textContent  = actNewCount.toLocaleString();
@@ -335,6 +348,7 @@ function renderTable(data, startIndex = 0, readOnly = false) {
 
 // ── Auto-recalc row ──────────────────────────────────────────
 function recalcRow(tr) {
+  if (!tr.querySelector('[data-field="budgeted_units"]')) return;
   const totalQty = parseFloat(tr.querySelector('[data-field="budgeted_units"]')?.value) || null;
   const prev     = parseFloat(tr.querySelector('[data-field="prev_week_qty"]')?.value)  || null;
   const thisWk   = parseFloat(tr.querySelector('[data-field="this_week_qty"]')?.value)  || null;
@@ -597,7 +611,12 @@ document.getElementById('export-btn').addEventListener('click', () => {
   try {
     btn.textContent = '⏳ ...'; btn.disabled = true;
 
-    const headers = [...document.querySelectorAll('#activity-table th')]
+    const thList = [...document.querySelectorAll('#activity-table th')];
+    const visibleIdx = thList
+      .map((th, i) => getComputedStyle(th).display !== 'none' ? i : null)
+      .filter(i => i !== null);
+    const headers = thList
+      .filter((_, i) => visibleIdx.includes(i))
       .map(th => th.innerText.replace(/\n/g, ' ').trim());
 
     const data = getFiltered();
@@ -618,7 +637,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
         statusLabel = (totalQ && compQ >= totalQ) ? 'Completed' : 'Ongoing';
       }
 
-      return [
+      const fullRow = [
         idx + 1,
         act.wbs_level ?? 9,
         fmtBlock(act.unit_no),
@@ -638,6 +657,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
         pct    != null ? pct.toFixed(1) + '%' : '',
         statusLabel,
       ];
+      return fullRow.filter((_, i) => visibleIdx.includes(i));
     });
 
     const wb = XLSX.utils.book_new();
@@ -700,11 +720,15 @@ function renderOverview() {
     const pw   = parseFloat(p.prev_week_qty || 0);
     const tw   = parseFloat(p.this_week_qty || 0);
     const cq   = pw + tw;
-    if (!byDisc[disc]) byDisc[disc] = {wf:0,prog:0,prev:0,this_:0};
-    byDisc[disc].wf    += wf;
-    byDisc[disc].prog  += wf * Math.min(1, cq / tq);
-    byDisc[disc].prev  += wf * Math.min(1, pw / tq);
-    byDisc[disc].this_ += wf * Math.min(1, tw / tq);
+    if (!byDisc[disc]) byDisc[disc] = {wf:0,prog:0,prev:0,this_:0,physN:0,physProg:0,physPrev:0,physThis:0};
+    byDisc[disc].wf       += wf;
+    byDisc[disc].prog     += wf * Math.min(1, cq / tq);
+    byDisc[disc].prev     += wf * Math.min(1, pw / tq);
+    byDisc[disc].this_    += wf * Math.min(1, tw / tq);
+    byDisc[disc].physN    += 1;
+    byDisc[disc].physProg += Math.min(1, cq / tq);
+    byDisc[disc].physPrev += Math.min(1, pw / tq);
+    byDisc[disc].physThis += Math.min(1, tw / tq);
   }
 
   // ── 1. Charts ─────────────────────────────────────────────
@@ -727,22 +751,22 @@ function renderOverview() {
   });
   document.getElementById('ov-wf-center').textContent = f3(prog) + '%';
 
-  // Chart 2: Progress 기준 (합계 = 100%) — completion rate scale
-  const progressRatePct = weightPct > 0 ? prog / weightPct * 100 : 0;
-  const thisWeekRatePct = weightPct > 0 ? thisWk / weightPct * 100 : 0;
-  const prevAccRate     = Math.max(0, progressRatePct - thisWeekRatePct);
-  const pRemain         = Math.max(0, 100 - progressRatePct);
+  // Chart 2: 물리적 공정률 (WF 무관, activity 단순 평균)
+  const physProgress = kpiState.physProgressPct || 0;
+  const physThisWk   = kpiState.physThisPct     || 0;
+  const physPrevAcc  = Math.max(0, physProgress - physThisWk);
+  const physRemain   = Math.max(0, 100 - physProgress);
   if (_chartProg) _chartProg.destroy();
   _chartProg = new Chart(document.getElementById('chart-progress'), {
     type: 'doughnut',
     data: {
       labels: ['Completed', 'This Week', 'Remaining'],
-      datasets: [{ data: [+prevAccRate.toFixed(3), +thisWeekRatePct.toFixed(3), +pRemain.toFixed(3)],
+      datasets: [{ data: [+physPrevAcc.toFixed(3), +physThisWk.toFixed(3), +physRemain.toFixed(3)],
         backgroundColor: ['#3b82f6','#22c55e','#e5e7eb'], borderWidth: 0 }]
     },
     options: { cutout: '72%', plugins: { legend:{display:false}, tooltip:{callbacks:{label: c=>`${c.label}: ${c.formattedValue}%`}} } }
   });
-  document.getElementById('ov-prog-center').textContent = f3(progressRatePct) + '%';
+  document.getElementById('ov-prog-center').textContent = f3(physProgress) + '%';
 
   // Discipline chart — 회색(Total Weight) 위에 파란색(Completed) 겹쳐서 표시
   const discEntries  = Object.entries(byDisc).sort((a,b) => b[1].wf - a[1].wf);
@@ -804,23 +828,24 @@ function renderOverview() {
   // ── 2. Discipline Summary ──────────────────────────────────
   const discBody = document.getElementById('ov-disc-body');
   discBody.innerHTML = '';
-  let tWf=0, tProg=0, tPrev=0, tThis=0;
+  let tWf=0, tProg=0, tPrev=0, tThis=0, ttPhysN=0, ttPhysProg=0, ttPhysPrev=0, ttPhysThis=0;
   for (const [disc, g] of discEntries) {
-    const progRate = g.wf > 0 ? g.prog/g.wf*100 : 0;
-    const prevRate = g.wf > 0 ? g.prev/g.wf*100 : 0;
-    const thisRate = g.wf > 0 ? g.this_/g.wf*100 : 0;
+    const progRate = g.physN > 0 ? g.physProg/g.physN*100 : 0;
+    const prevRate = g.physN > 0 ? g.physPrev/g.physN*100 : 0;
+    const thisRate = g.physN > 0 ? g.physThis/g.physN*100 : 0;
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${disc}</td>
       <td>${f2(g.wf*100)}%</td><td>${f3(g.prog*100)}%</td><td>${f3(g.prev*100)}%</td><td>${f3(g.this_*100)}%</td>
       <td>${f3(progRate)}%</td><td>${f3(prevRate)}%</td><td>${f3(thisRate)}%</td>`;
     discBody.appendChild(tr);
     tWf+=g.wf; tProg+=g.prog; tPrev+=g.prev; tThis+=g.this_;
+    ttPhysN+=g.physN; ttPhysProg+=g.physProg; ttPhysPrev+=g.physPrev; ttPhysThis+=g.physThis;
   }
   const tf = document.createElement('tr');
   tf.className = 'ov-total';
-  const tProgRate = tWf > 0 ? tProg/tWf*100 : 0;
-  const tPrevRate = tWf > 0 ? tPrev/tWf*100 : 0;
-  const tThisRate = tWf > 0 ? tThis/tWf*100 : 0;
+  const tProgRate = ttPhysN > 0 ? ttPhysProg/ttPhysN*100 : 0;
+  const tPrevRate = ttPhysN > 0 ? ttPhysPrev/ttPhysN*100 : 0;
+  const tThisRate = ttPhysN > 0 ? ttPhysThis/ttPhysN*100 : 0;
   tf.innerHTML = `<td>Total</td>
     <td>${f2(tWf*100)}%</td><td>${f3(tProg*100)}%</td><td>${f3(tPrev*100)}%</td><td>${f3(tThis*100)}%</td>
     <td>${f3(tProgRate)}%</td><td>${f3(tPrevRate)}%</td><td>${f3(tThisRate)}%</td>`;
@@ -886,11 +911,14 @@ function switchTab(tab) {
 
   document.getElementById('tab-pms').style.display      = (isPmsTab || tab === 'report') ? '' : 'none';
   document.getElementById('tab-overview').style.display = tab === 'overview' ? '' : 'none';
+  document.getElementById('activity-table').classList.toggle('report-mode', tab === 'report');
 
   // Save 버튼: 리포트 탭에서는 숨김
   document.getElementById('save-btn').style.display = reportMode ? 'none' : '';
-  // Discipline 필터: 디스ciplin 탭에서는 탭 자체가 필터이므로 숨김
-  document.getElementById('discipline-filter-group').style.display = isPmsTab ? 'none' : '';
+  // Discipline/Area 필터: discipline 탭이나 report 탭에서는 숨김
+  const hideDiscArea = isPmsTab || reportMode;
+  document.getElementById('discipline-filter-group').style.display = hideDiscArea ? 'none' : '';
+  document.getElementById('area-filter-group').style.display       = reportMode   ? 'none' : '';
 
   if (isPmsTab) {
     selectedDiscipline = DISC_TABS[tab];
