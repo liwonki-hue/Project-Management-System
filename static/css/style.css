@@ -55,6 +55,7 @@ header h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.2px; color: #1e
 .kpi-clickable.kpi-active { background: #eff6ff; box-shadow: 0 0 0 2px #2563eb; }
 .kpi-value { font-size: 22px; font-weight: 700; color: #1a1a2e; }
 .kpi-label { font-size: 11px; color: #888; margin-top: 4px; }
+.kpi-week-range { font-size: 10px; color: #aaa; }
 
 /* ── Filter bar ── */
 .filter-bar {

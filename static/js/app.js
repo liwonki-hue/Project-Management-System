@@ -21,6 +21,39 @@ let currentPage = 1;
 
 const PROG_FIELDS = ['actual_start', 'actual_finish', 'prev_week_qty', 'this_week_qty'];
 
+// 목~수 주간에서 해당 주의 수요일(마감일) 반환 (YYYY-MM-DD, 로컬 날짜 기준)
+function getWeekWednesday(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + (3 - d.getDay() + 7) % 7);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// 해당 주의 목요일(시작일) 반환 (YYYY-MM-DD)
+function getWeekThursday(wedDate) {
+  const d = new Date(wedDate);
+  d.setDate(d.getDate() - 6);
+  return d.toISOString().slice(0, 10);
+}
+
+// 날짜를 "MM/DD(요일)" 포맷으로 반환
+function fmtWeekDate(isoDate) {
+  const d = new Date(isoDate + 'T00:00:00');
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${mm}/${dd}(${days[d.getDay()]})`;
+}
+
+function updateWeekRangeLabel() {
+  const wed = getWeekWednesday(new Date());
+  const thu = getWeekThursday(wed);
+  const label = `${fmtWeekDate(thu)} ~ ${fmtWeekDate(wed)}`;
+  document.querySelectorAll('.kpi-week-range').forEach(el => { el.textContent = label; });
+}
+
 function valChanged(cur, orig) {
   const a = (cur == null || cur === '') ? null : String(cur);
   const b = (orig == null || orig === '') ? null : String(orig);
@@ -76,6 +109,7 @@ async function loadData() {
 
   render();
   renderOverview();
+  updateWeekRangeLabel();
 
 }
 
@@ -121,7 +155,7 @@ function updateAreaDropdown(activities) {
   areaSel.innerHTML = '<option value="">All</option>';
   areas.forEach(a => {
     const o = document.createElement('option');
-    o.value = a; o.textContent = a;
+    o.value = a; o.textContent = a.toUpperCase();
     areaSel.appendChild(o);
   });
   areaSel.value = areas.includes(prev) ? prev : '';
@@ -295,27 +329,37 @@ function renderTable(data, startIndex = 0, readOnly = false) {
       ? (parseFloat(act.weight_factor) * 100).toFixed(4)
       : '-';
     const level = act.wbs_level ?? 9;
+    const totalQ = act.budgeted_units != null ? parseFloat(act.budgeted_units) : null;
+    const remaining = (totalQ != null && completed != null) ? totalQ - completed : null;
+    const pct = (totalQ && totalQ > 0 && completed != null)
+      ? Math.min(100, (completed / totalQ) * 100) : null;
+    let initStatusKey = 'not-start', initStatusLabel = 'Not Start';
+    if (completed != null && completed > 0) {
+      if (totalQ && totalQ > 0 && completed >= totalQ) {
+        initStatusKey = 'completed'; initStatusLabel = 'Completed';
+      } else {
+        initStatusKey = 'ongoing'; initStatusLabel = 'Ongoing';
+      }
+    }
 
-    const ro = readOnly;
-    const areaCell = ro
-      ? `<td style="text-align:center">${act.area_system || '-'}</td>`
-      : `<td><input type="text" class="qty-input area-input" data-id="${act.activity_id}" data-field="area_system" data-table="activities" value="${act.area_system || ''}"></td>`;
-    const startCell = ro
+    const areaVal  = act.area_system ? act.area_system.toUpperCase() : '-';
+    const areaCell = `<td style="text-align:center">${areaVal}</td>`;
+    const startCell = readOnly
       ? `<td>${startVal || '-'}</td>`
       : `<td><input type="date" class="date-input${startVal ? ' has-val' : ''}" data-id="${act.activity_id}" data-field="actual_start" value="${startVal}"></td>`;
-    const finishCell = ro
+    const finishCell = readOnly
       ? `<td>${finishVal || '-'}</td>`
       : `<td><input type="date" class="date-input${finishVal ? ' has-val' : ''}" data-id="${act.activity_id}" data-field="actual_finish" value="${finishVal}"></td>`;
-    const unitCell = ro
+    const unitCell = readOnly
       ? `<td>${ut || '-'}</td>`
       : `<td><select class="unit-select" data-id="${act.activity_id}"><option value=""></option>${unitOpts}</select></td>`;
-    const totalCell = ro
+    const totalCell = readOnly
       ? `<td>${act.budgeted_units != null ? Math.round(act.budgeted_units).toLocaleString() : '-'}</td>`
       : `<td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="budgeted_units" data-table="activities" value="${act.budgeted_units != null ? Math.round(act.budgeted_units) : ''}"></td>`;
-    const prevCell = ro
+    const prevCell = readOnly
       ? `<td>${prevWk != null && prevWk > 0 ? Math.round(prevWk).toLocaleString() : '-'}</td>`
       : `<td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="prev_week_qty" data-table="progress" value="${prevWk != null && prevWk > 0 ? Math.round(prevWk) : ''}"></td>`;
-    const thisCell = ro
+    const thisCell = readOnly
       ? `<td>${thisWk != null && thisWk > 0 ? Math.round(thisWk).toLocaleString() : '-'}</td>`
       : `<td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="this_week_qty" data-table="progress" value="${thisWk != null && thisWk > 0 ? Math.round(thisWk) : ''}"></td>`;
 
@@ -336,10 +380,10 @@ function renderTable(data, startIndex = 0, readOnly = false) {
       ${totalCell}
       ${prevCell}
       ${thisCell}
-      <td class="completed-cell">${fmtNum(completed, 0)}</td>
-      <td class="remaining-cell">-</td>
-      <td class="progress-cell">${PROG_DASH}</td>
-      <td class="status-cell"></td>
+      <td class="completed-cell">${completed != null ? Math.round(completed).toLocaleString() : '-'}</td>
+      <td class="remaining-cell">${remaining != null ? Math.round(remaining).toLocaleString() : '-'}</td>
+      <td class="progress-cell">${pct != null ? `<div class="progress-bar"><div class="progress-fill" style="width:${pct.toFixed(1)}%"></div></div><span class="progress-text">${pct.toFixed(1)}%</span>` : PROG_DASH}</td>
+      <td class="status-cell"><span class="status-badge status-${initStatusKey}">${initStatusLabel}</span></td>
     `;
     tbody.appendChild(tr);
     recalcRow(tr);
@@ -386,13 +430,6 @@ function toISODate(val) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
   return isNaN(d) ? '' : d.toISOString().slice(0, 10);
-}
-
-function fmtNum(val, decimals = 1) {
-  if (val == null || val === '') return '-';
-  const n = parseFloat(val);
-  if (isNaN(n)) return '-';
-  return n.toLocaleString(undefined, { maximumFractionDigits: decimals });
 }
 
 // ── Events ──────────────────────────────────────────────────
@@ -473,11 +510,10 @@ document.getElementById('table-body').addEventListener('change', async e => {
     } catch (err) { console.error('날짜 저장 실패:', err); }
     return;
   }
-  if (e.target.classList.contains('qty-input') && !e.target.classList.contains('area-input')) {
+  if (e.target.classList.contains('qty-input')) {
     recalcRow(e.target.closest('tr'));
     return;
   }
-  if (e.target.classList.contains('area-input')) return;
   if (!e.target.classList.contains('unit-select')) return;
   const sel        = e.target;
   const tr         = sel.closest('tr');
@@ -521,10 +557,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const btn = document.getElementById('save-btn');
   btn.textContent = '저장 중...'; btn.disabled = true;
 
-  // 기존 최신 report_date 또는 오늘 날짜
-  const reportDate = allProgress.reduce((max, p) =>
-    (!max || p.report_date > max) ? p.report_date : max, null
-  ) || new Date().toISOString().slice(0, 10);
+  // 이번 주(목~수) 수요일을 report_date로 고정 (같은 주에 여러 번 저장해도 동일 날짜)
+  const reportDate = getWeekWednesday(new Date());
 
   const rows = document.querySelectorAll('#table-body tr');
   const actMap = {}, progMap = {};
@@ -642,7 +676,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
         act.wbs_level ?? 9,
         fmtBlock(act.unit_no),
         act.department || '',
-        act.area_system || '',
+        act.area_system ? act.area_system.toUpperCase() : '',
         act.activity_id   || '',
         act.activity_name || '',
         wf != null ? (wf * 100).toFixed(4) : '',
