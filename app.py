@@ -3,6 +3,7 @@ from flask import Flask, jsonify, render_template, request
 from flask_compress import Compress
 from concurrent.futures import ThreadPoolExecutor
 import db
+import jm_sync
 
 app = Flask(__name__)
 Compress(app)
@@ -28,6 +29,16 @@ def _patch_progress(p):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/api/sync_jm', methods=['POST'])
+def sync_jm():
+    try:
+        result = jm_sync.sync()
+        return jsonify({'ok': True, 'synced': result['synced'], 'failed': result['failed']})
+    except Exception as e:
+        print(f'[sync_jm 오류] {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @app.route('/api/activities')

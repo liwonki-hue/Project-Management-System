@@ -79,7 +79,16 @@ async function loadData() {
   const loading   = document.getElementById('loading');
   const tableWrap = document.getElementById('table-wrap');
   loading.style.display   = 'block';
+  loading.textContent     = 'JM 데이터 동기화 중...';
   tableWrap.style.display = 'none';
+
+  try {
+    await fetch('/api/sync_jm', { method: 'POST' });
+  } catch (err) {
+    console.error('JM 동기화 실패, 기존 데이터로 계속 진행:', err);
+  }
+
+  loading.textContent = 'Loading data...';
 
   try {
     const [actRes, progRes] = await Promise.all([
