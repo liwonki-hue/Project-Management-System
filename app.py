@@ -1,4 +1,5 @@
 # PMS Dashboard Flask 서버 — API 라우트 + 정적 파일 서빙
+import time
 from flask import Flask, jsonify, render_template, request
 from flask_compress import Compress
 from concurrent.futures import ThreadPoolExecutor
@@ -7,6 +8,10 @@ import jm_sync
 
 app = Flask(__name__)
 Compress(app)
+
+SYNC_JM_CACHE_SECONDS = 300  # 이 시간 내 재요청은 동기화를 건너뛰고 직전 결과를 반환
+_last_sync_jm_at = 0
+_last_sync_jm_result = None
 
 
 def _patch_progress(p):
@@ -33,9 +38,17 @@ def index():
 
 @app.route('/api/sync_jm', methods=['POST'])
 def sync_jm():
+    global _last_sync_jm_at, _last_sync_jm_result
+
+    now = time.time()
+    if _last_sync_jm_result and (now - _last_sync_jm_at) < SYNC_JM_CACHE_SECONDS:
+        return jsonify({'ok': True, 'cached': True, **_last_sync_jm_result})
+
     try:
         result = jm_sync.sync()
-        return jsonify({'ok': True, 'synced': result['synced'], 'failed': result['failed']})
+        _last_sync_jm_result = {'synced': result['synced'], 'failed': result['failed']}
+        _last_sync_jm_at = now
+        return jsonify({'ok': True, 'cached': False, **_last_sync_jm_result})
     except Exception as e:
         print(f'[sync_jm 오류] {e}')
         return jsonify({'ok': False, 'error': str(e)}), 500
