@@ -825,14 +825,17 @@ function renderOverview() {
   document.getElementById('ov-prog-center').textContent = f3(physProgress) + '%';
 
   // Discipline chart — discipline당 세로 막대 2개(나란히).
-  // 분홍 막대: 이 discipline이 Project 전체에서 차지하는 비중(Weight %)
-  // 파란+초록 스택 막대: discipline 자체 진행율 — Previous Week(파란) + This Week(초록) 동시 표시
+  // 4개 discipline의 weight 합(18.88%)을 100%로 재정규화 — 이 4개 discipline 전체가
+  // "Project Total 100%"가 되도록 하고, Previous/This Week도 같은 기준으로 재계산.
+  // 분홍 막대: 이 discipline이 (재정규화된) Project Total에서 차지하는 비중
+  // 파란+초록 스택 막대: 같은 기준으로 본 Previous Week(파란) + This Week(초록) 달성분
   const DISC_ORDER  = { 'MECH': 0, 'PIPING': 1, 'HVAC': 2, 'FF': 3 };
   const discEntries = Object.entries(byDisc).sort((a, b) => (DISC_ORDER[a[0]] ?? 99) - (DISC_ORDER[b[0]] ?? 99));
+  const totalDiscWf  = discEntries.reduce((s, [,g]) => s + g.wf, 0) || 1;
   const discLabels    = discEntries.map(([d]) => d === 'MECH' ? 'BOP MECH' : d);
-  const discWeightAbs = discEntries.map(([,g]) => +(g.wf * 100).toFixed(3));
-  const discPrevAbs   = discEntries.map(([,g]) => +(g.physN > 0 ? g.physPrev/g.physN*100 : 0).toFixed(3));
-  const discThisAbs   = discEntries.map(([,g]) => +(g.physN > 0 ? g.physThis/g.physN*100 : 0).toFixed(3));
+  const discWeightAbs = discEntries.map(([,g]) => +(g.wf    / totalDiscWf * 100).toFixed(3));
+  const discPrevAbs   = discEntries.map(([,g]) => +(g.prev  / totalDiscWf * 100).toFixed(3));
+  const discThisAbs   = discEntries.map(([,g]) => +(g.this_ / totalDiscWf * 100).toFixed(3));
   const maxBarPct     = Math.max(...discWeightAbs, ...discPrevAbs.map((p,i)=>p+discThisAbs[i]), 0.01);
 
   if (_chartDisc) _chartDisc.destroy();
