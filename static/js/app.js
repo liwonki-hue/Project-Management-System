@@ -261,10 +261,6 @@ function renderKPIs(data) {
   let actPrevCount = 0;
   let actThisCount = 0;
   let actNewCount  = 0;
-  let physN        = 0;
-  let physProgSum  = 0;
-  let physPrevSum  = 0;
-  let physThisSum  = 0;
 
   for (const act of data) {
     const p       = progressMap[act.activity_id] || {};
@@ -280,11 +276,6 @@ function renderKPIs(data) {
     if (prevWk > 0) actPrevCount++;
     if (thisWk > 0) actThisCount++;
     if (thisWk > 0 && prevWk === 0) actNewCount++;
-
-    physN++;
-    physProgSum += Math.min(1, compQ  / totalQ);
-    physPrevSum += Math.min(1, prevWk / totalQ);
-    physThisSum += Math.min(1, thisWk / totalQ);
 
     if (wf > 0) {
       progressPct += wf * Math.min(1, compQ  / totalQ) * 100;
@@ -302,11 +293,7 @@ function renderKPIs(data) {
   const prevWeekRatePct = weightPct > 0 ? prevWeekPct / weightPct * 100 : 0;
   const thisWeekRatePct = weightPct > 0 ? thisWeekPct / weightPct * 100 : 0;
 
-  const physProgressPct = physN > 0 ? physProgSum / physN * 100 : 0;
-  const physPrevPct     = physN > 0 ? physPrevSum / physN * 100 : 0;
-  const physThisPct     = physN > 0 ? physThisSum / physN * 100 : 0;
-
-  kpiState = { weightPct, progressPct, prevWeekPct, thisWeekPct, progressRatePct, prevWeekRatePct, thisWeekRatePct, physProgressPct, physPrevPct, physThisPct };
+  kpiState = { weightPct, progressPct, prevWeekPct, thisWeekPct, progressRatePct, prevWeekRatePct, thisWeekRatePct };
 
   document.getElementById('kpi-weight-lbl').textContent   = fmt2(weightPct) + '%';
   document.getElementById('kpi-prog-lbl').textContent     = '100%';
@@ -314,9 +301,9 @@ function renderKPIs(data) {
   document.getElementById('kpi-pw-wf').textContent        = fmt3(prevWeekPct) + '%';
   document.getElementById('kpi-tw-wf').textContent        = fmt3(thisWeekPct) + '%';
   document.getElementById('kpi-wf-completed').textContent = fmt3(progressPct) + '%';
-  document.getElementById('kpi-progress').textContent  = fmt3(physProgressPct) + '%';
-  document.getElementById('kpi-prev-week').textContent = fmt3(physPrevPct)     + '%';
-  document.getElementById('kpi-this-week').textContent = fmt3(physThisPct)     + '%';
+  document.getElementById('kpi-progress').textContent  = fmt3(progressRatePct) + '%';
+  document.getElementById('kpi-prev-week').textContent = fmt3(prevWeekRatePct) + '%';
+  document.getElementById('kpi-this-week').textContent = fmt3(thisWeekRatePct) + '%';
   document.getElementById('kpi-act-prev').textContent = actPrevCount.toLocaleString();
   document.getElementById('kpi-act-this').textContent = actThisCount.toLocaleString();
   document.getElementById('kpi-act-new').textContent  = actNewCount.toLocaleString();
@@ -803,21 +790,22 @@ function renderOverview() {
   });
   document.getElementById('ov-wf-center').textContent = f3(prog) + '%';
 
-  // Chart 2: 물리적 공정률 (WF 무관, activity 단순 평균)
+  // Chart 2: Progress — weight 가중평균(Project Weight 합=100% 재정규화) 기준.
+  // Discipline Summary 테이블·Discipline Progress 차트와 동일한 산식.
   // Completed = Prev Week + This Week 누적 합계(실제 완료 총량)
-  const physProgress = kpiState.physProgressPct || 0;
-  const physRemain   = Math.max(0, 100 - physProgress);
+  const chartProgress = kpiState.progressRatePct || 0;
+  const chartRemain   = Math.max(0, 100 - chartProgress);
   if (_chartProg) _chartProg.destroy();
   _chartProg = new Chart(document.getElementById('chart-progress'), {
     type: 'doughnut',
     data: {
       labels: ['Completed', 'Remaining'],
-      datasets: [{ data: [+physProgress.toFixed(3), +physRemain.toFixed(3)],
+      datasets: [{ data: [+chartProgress.toFixed(3), +chartRemain.toFixed(3)],
         backgroundColor: ['#3b82f6','#e5e7eb'], borderWidth: 0 }]
     },
     options: { cutout: '72%', plugins: { legend:{display:false}, tooltip:{callbacks:{label: c=>`${c.label}: ${c.formattedValue}%`}} } }
   });
-  document.getElementById('ov-prog-center').textContent = f3(physProgress) + '%';
+  document.getElementById('ov-prog-center').textContent = f3(chartProgress) + '%';
 
   // Discipline chart — discipline당 세로 막대 2개(나란히).
   // 4개 discipline의 weight 합(18.88%)을 100%로 재정규화 — 이 4개 discipline 전체가
