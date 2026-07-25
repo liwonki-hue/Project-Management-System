@@ -824,13 +824,16 @@ function renderOverview() {
   });
   document.getElementById('ov-prog-center').textContent = f3(physProgress) + '%';
 
-  // Discipline chart — 파란색(Completed Progress), 녹색(This Week Progress)
-  const DISC_ORDER      = { 'MECH': 0, 'PIPING': 1, 'HVAC': 2, 'FF': 3 };
-  const discEntries     = Object.entries(byDisc).sort((a, b) => (DISC_ORDER[a[0]] ?? 99) - (DISC_ORDER[b[0]] ?? 99));
-  const discLabels      = discEntries.map(([d]) => d === 'MECH' ? 'BOP MECH' : d);
-  const discProgAbs     = discEntries.map(([,g]) => +(g.physN > 0 ? g.physProg/g.physN*100 : 0).toFixed(3));
-  const discThisProgAbs = discEntries.map(([,g]) => +(g.physN > 0 ? g.physThis/g.physN*100 : 0).toFixed(3));
-  const maxProgPct      = Math.max(...discProgAbs, 0.01);
+  // Discipline chart — 막대는 항상 discipline 자체 weight=100% 기준으로 정규화.
+  // 그 안에서 Previous/This Week이 차지하는 비율을 초록 스택으로 표시(진도가 잘 보이도록),
+  // 프로젝트 전체 대비 비중(weight%)은 x축 라벨 아래 별도 표기.
+  const DISC_ORDER  = { 'MECH': 0, 'PIPING': 1, 'HVAC': 2, 'FF': 3 };
+  const discEntries = Object.entries(byDisc).sort((a, b) => (DISC_ORDER[a[0]] ?? 99) - (DISC_ORDER[b[0]] ?? 99));
+  const discLabels     = discEntries.map(([d]) => d === 'MECH' ? 'BOP MECH' : d);
+  const discWeightAbs  = discEntries.map(([,g]) => +(g.wf * 100).toFixed(3));
+  const discPrevPct    = discEntries.map(([,g]) => +(g.wf > 0 ? g.prev  / g.wf * 100 : 0).toFixed(3));
+  const discThisPct    = discEntries.map(([,g]) => +(g.wf > 0 ? g.this_ / g.wf * 100 : 0).toFixed(3));
+  const discRemainPct  = discPrevPct.map((p, i) => +Math.max(0, 100 - p - discThisPct[i]).toFixed(3));
 
   if (_chartDisc) _chartDisc.destroy();
   _chartDisc = new Chart(document.getElementById('chart-discipline'), {
@@ -839,39 +842,46 @@ function renderOverview() {
     data: {
       labels: discLabels,
       datasets: [
-        { label: 'Completed (%)', data: discProgAbs,     backgroundColor: '#60a5fa', barPercentage: 0.6, categoryPercentage: 1.0, order: 0 },
-        { label: 'This Week (%)', data: discThisProgAbs, backgroundColor: '#22c55e', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 }
+        { label: 'Previous Week (%)', data: discPrevPct,   backgroundColor: '#22c55e', stack: 'p', barPercentage: 0.6, categoryPercentage: 0.8 },
+        { label: 'This Week (%)',     data: discThisPct,   backgroundColor: '#16a34a', stack: 'p', barPercentage: 0.6, categoryPercentage: 0.8 },
+        { label: 'Remaining (%)',     data: discRemainPct, backgroundColor: '#e5e7eb', stack: 'p', barPercentage: 0.6, categoryPercentage: 0.8 }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       scales: {
-        x: { ticks: { maxRotation: 40, font: { size: 10 } }, grid: { display: false } },
+        x: {
+          stacked: true,
+          ticks: { maxRotation: 0, font: { size: 10 }, callback: (v, i) => [discLabels[i], `(${discWeightAbs[i]}%)`] },
+          grid: { display: false }
+        },
         y: {
-          max: Math.ceil(maxProgPct * 1.3),
-          ticks: { callback: v => v.toFixed(1) + '%', font: { size: 10 } },
+          stacked: true, min: 0, max: 100,
+          ticks: { callback: v => v + '%', font: { size: 10 } },
           grid: { color: '#f0f0f0' }
         }
       },
       plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, padding: 10 } },
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: 10, font: { size: 10 }, padding: 10,
+            filter: item => item.text !== 'Remaining (%)'
+          }
+        },
         tooltip: {
           callbacks: {
-            label: ctx => {
-              const g = discEntries[ctx.dataIndex]?.[1] ?? {};
-              if (ctx.datasetIndex === 0) return `Progress: ${(g.physN > 0 ? g.physProg/g.physN*100 : 0).toFixed(3)}%`;
-              return `This Week: ${(g.physN > 0 ? g.physThis/g.physN*100 : 0).toFixed(3)}%`;
-            }
+            label: ctx => `${ctx.dataset.label}: ${ctx.formattedValue}%`,
+            footer: items => `Project Weight: ${discWeightAbs[items[0].dataIndex]}%`
           }
         },
         datalabels: {
-          display: true,
-          anchor: 'end',
-          align: 'top',
-          formatter: (v) => v > 0 ? v.toFixed(3) + '%' : '',
+          display: (ctx) => ctx.dataset.label !== 'Remaining (%)',
+          anchor: 'center',
+          align: 'center',
+          formatter: (v) => v > 0.05 ? v.toFixed(1) + '%' : '',
           font: { size: 9, weight: '600' },
-          color: ctx => ctx.datasetIndex === 0 ? '#2563eb' : '#16a34a',
-          offset: 2
+          color: '#ffffff'
         }
       }
     }
