@@ -776,15 +776,11 @@ function renderOverview() {
     const pw   = parseFloat(p.prev_week_qty || 0);
     const tw   = parseFloat(p.this_week_qty || 0);
     const cq   = pw + tw;
-    if (!byDisc[disc]) byDisc[disc] = {wf:0,prog:0,prev:0,this_:0,physN:0,physProg:0,physPrev:0,physThis:0};
+    if (!byDisc[disc]) byDisc[disc] = {wf:0,prog:0,prev:0,this_:0};
     byDisc[disc].wf       += wf;
     byDisc[disc].prog     += wf * Math.min(1, cq / tq);
     byDisc[disc].prev     += wf * Math.min(1, pw / tq);
     byDisc[disc].this_    += wf * Math.min(1, tw / tq);
-    byDisc[disc].physN    += 1;
-    byDisc[disc].physProg += Math.min(1, cq / tq);
-    byDisc[disc].physPrev += Math.min(1, pw / tq);
-    byDisc[disc].physThis += Math.min(1, tw / tq);
   }
 
   // ── 1. Charts ─────────────────────────────────────────────
@@ -808,17 +804,16 @@ function renderOverview() {
   document.getElementById('ov-wf-center').textContent = f3(prog) + '%';
 
   // Chart 2: 물리적 공정률 (WF 무관, activity 단순 평균)
+  // Completed = Prev Week + This Week 누적 합계(실제 완료 총량)
   const physProgress = kpiState.physProgressPct || 0;
-  const physThisWk   = kpiState.physThisPct     || 0;
-  const physPrevAcc  = Math.max(0, physProgress - physThisWk);
   const physRemain   = Math.max(0, 100 - physProgress);
   if (_chartProg) _chartProg.destroy();
   _chartProg = new Chart(document.getElementById('chart-progress'), {
     type: 'doughnut',
     data: {
-      labels: ['Completed', 'This Week', 'Remaining'],
-      datasets: [{ data: [+physPrevAcc.toFixed(3), +physThisWk.toFixed(3), +physRemain.toFixed(3)],
-        backgroundColor: ['#3b82f6','#22c55e','#e5e7eb'], borderWidth: 0 }]
+      labels: ['Completed', 'Remaining'],
+      datasets: [{ data: [+physProgress.toFixed(3), +physRemain.toFixed(3)],
+        backgroundColor: ['#3b82f6','#e5e7eb'], borderWidth: 0 }]
     },
     options: { cutout: '72%', plugins: { legend:{display:false}, tooltip:{callbacks:{label: c=>`${c.label}: ${c.formattedValue}%`}} } }
   });
@@ -845,9 +840,9 @@ function renderOverview() {
     data: {
       labels: discLabels,
       datasets: [
-        { label: 'Project Weight (%)', data: discWeightAbs, backgroundColor: '#f472b6', stack: 'weight',   barPercentage: 0.6, categoryPercentage: 1.0, order: 0 },
-        { label: 'Previous Week (%)',  data: discPrevAbs,   backgroundColor: '#60a5fa', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 },
-        { label: 'This Week (%)',      data: discThisAbs,   backgroundColor: '#22c55e', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 }
+        { label: 'Project Weight (%)', data: discWeightAbs, backgroundColor: '#3b82f6', stack: 'weight',   barPercentage: 0.6, categoryPercentage: 1.0, order: 0 },
+        { label: 'Previous Week (%)',  data: discPrevAbs,   backgroundColor: '#22c55e', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 },
+        { label: 'This Week (%)',      data: discThisAbs,   backgroundColor: '#16a34a', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 }
       ]
     },
     options: {
@@ -874,7 +869,7 @@ function renderOverview() {
           align: 'top',
           formatter: (v) => v.toFixed(3) + '%',
           font: { size: 9, weight: '600' },
-          color: ctx => ['#db2777', '#2563eb', '#16a34a'][ctx.datasetIndex],
+          color: ctx => ['#2563eb', '#15803d', '#14532d'][ctx.datasetIndex],
           offset: 2
         }
       }
@@ -882,29 +877,32 @@ function renderOverview() {
   });
 
   // ── 2. Discipline Summary ──────────────────────────────────
+  // PROGRESS 그룹은 차트와 동일하게 4개 discipline weight 합=100% 기준으로 재정규화.
+  // Progress(=비중) / Completed(=Prev+This) / Prev Week / This Week 순서로 표시.
   const discBody = document.getElementById('ov-disc-body');
   discBody.innerHTML = '';
-  let tWf=0, tProg=0, tPrev=0, tThis=0, ttPhysN=0, ttPhysProg=0, ttPhysPrev=0, ttPhysThis=0;
+  let tWf=0, tProg=0, tPrev=0, tThis=0;
   for (const [disc, g] of discEntries) {
-    const progRate = g.physN > 0 ? g.physProg/g.physN*100 : 0;
-    const prevRate = g.physN > 0 ? g.physPrev/g.physN*100 : 0;
-    const thisRate = g.physN > 0 ? g.physThis/g.physN*100 : 0;
+    const normProg = g.wf   / totalDiscWf * 100;
+    const normComp = (g.prev + g.this_) / totalDiscWf * 100;
+    const normPrev = g.prev / totalDiscWf * 100;
+    const normThis = g.this_/ totalDiscWf * 100;
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${disc === 'MECH' ? 'BOP MECH' : disc}</td>
       <td>${f2(g.wf*100)}%</td><td>${f3(g.prog*100)}%</td><td>${f3(g.prev*100)}%</td><td>${f3(g.this_*100)}%</td>
-      <td>${f3(progRate)}%</td><td>${f3(prevRate)}%</td><td>${f3(thisRate)}%</td>`;
+      <td>${f3(normProg)}%</td><td>${f3(normComp)}%</td><td>${f3(normPrev)}%</td><td>${f3(normThis)}%</td>`;
     discBody.appendChild(tr);
     tWf+=g.wf; tProg+=g.prog; tPrev+=g.prev; tThis+=g.this_;
-    ttPhysN+=g.physN; ttPhysProg+=g.physProg; ttPhysPrev+=g.physPrev; ttPhysThis+=g.physThis;
   }
   const tf = document.createElement('tr');
   tf.className = 'ov-total';
-  const tProgRate = ttPhysN > 0 ? ttPhysProg/ttPhysN*100 : 0;
-  const tPrevRate = ttPhysN > 0 ? ttPhysPrev/ttPhysN*100 : 0;
-  const tThisRate = ttPhysN > 0 ? ttPhysThis/ttPhysN*100 : 0;
+  const tNormProg = tWf   / totalDiscWf * 100;
+  const tNormComp = (tPrev + tThis) / totalDiscWf * 100;
+  const tNormPrev = tPrev / totalDiscWf * 100;
+  const tNormThis = tThis / totalDiscWf * 100;
   tf.innerHTML = `<td>Total</td>
     <td>${f2(tWf*100)}%</td><td>${f3(tProg*100)}%</td><td>${f3(tPrev*100)}%</td><td>${f3(tThis*100)}%</td>
-    <td>${f3(tProgRate)}%</td><td>${f3(tPrevRate)}%</td><td>${f3(tThisRate)}%</td>`;
+    <td>${f3(tNormProg)}%</td><td>${f3(tNormComp)}%</td><td>${f3(tNormPrev)}%</td><td>${f3(tNormThis)}%</td>`;
   discBody.appendChild(tf);
 
   // ── 3. Activity Tables ─────────────────────────────────────
