@@ -829,8 +829,8 @@ function renderOverview() {
       labels: discLabels,
       datasets: [
         { label: 'Project Weight (%)', data: discWeightAbs, backgroundColor: '#3b82f6', stack: 'weight',   barPercentage: 0.6, categoryPercentage: 1.0, order: 0 },
-        { label: 'Previous Week (%)',  data: discPrevAbs,   backgroundColor: '#22c55e', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 },
-        { label: 'This Week (%)',      data: discThisAbs,   backgroundColor: '#16a34a', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 }
+        { label: 'Completed - Prev Week (%)', data: discPrevAbs, backgroundColor: '#22c55e', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 },
+        { label: 'Completed - This Week (%)', data: discThisAbs, backgroundColor: '#16a34a', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 }
       ]
     },
     options: {
