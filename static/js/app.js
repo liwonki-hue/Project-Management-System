@@ -825,8 +825,8 @@ function renderOverview() {
   document.getElementById('ov-prog-center').textContent = f3(physProgress) + '%';
 
   // Discipline chart — discipline당 세로 막대 2개(나란히).
-  // 파란 막대: 이 discipline이 Project 전체에서 차지하는 비중(Weight %)
-  // 초록 막대: 이 discipline 자체의 진행율 — Previous Week + This Week를 스택으로 동시 표시
+  // 분홍 막대: 이 discipline이 Project 전체에서 차지하는 비중(Weight %)
+  // 파란+초록 스택 막대: discipline 자체 진행율 — Previous Week(파란) + This Week(초록) 동시 표시
   const DISC_ORDER  = { 'MECH': 0, 'PIPING': 1, 'HVAC': 2, 'FF': 3 };
   const discEntries = Object.entries(byDisc).sort((a, b) => (DISC_ORDER[a[0]] ?? 99) - (DISC_ORDER[b[0]] ?? 99));
   const discLabels    = discEntries.map(([d]) => d === 'MECH' ? 'BOP MECH' : d);
@@ -842,9 +842,9 @@ function renderOverview() {
     data: {
       labels: discLabels,
       datasets: [
-        { label: 'Project Weight (%)', data: discWeightAbs, backgroundColor: '#60a5fa', stack: 'weight',   barPercentage: 0.6, categoryPercentage: 1.0, order: 0 },
-        { label: 'Previous Week (%)',  data: discPrevAbs,   backgroundColor: '#22c55e', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 },
-        { label: 'This Week (%)',      data: discThisAbs,   backgroundColor: '#16a34a', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 }
+        { label: 'Project Weight (%)', data: discWeightAbs, backgroundColor: '#f472b6', stack: 'weight',   barPercentage: 0.6, categoryPercentage: 1.0, order: 0 },
+        { label: 'Previous Week (%)',  data: discPrevAbs,   backgroundColor: '#3b82f6', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 },
+        { label: 'This Week (%)',      data: discThisAbs,   backgroundColor: '#22c55e', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 }
       ]
     },
     options: {
@@ -871,7 +871,7 @@ function renderOverview() {
           align:  ctx => ctx.datasetIndex === 0 ? 'top'  : 'center',
           formatter: (v) => v > 0.01 ? v.toFixed(3) + '%' : '',
           font: { size: 9, weight: '600' },
-          color: ctx => ctx.datasetIndex === 0 ? '#2563eb' : '#ffffff',
+          color: ctx => ctx.datasetIndex === 0 ? '#db2777' : '#ffffff',
           offset: 2
         }
       }
