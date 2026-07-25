@@ -776,7 +776,7 @@ function renderOverview() {
   const weightPct = kpiState.weightPct   || 0;
   const prevAcc   = Math.max(0, prog - thisWk);
 
-  // Chart 1: Project Weight 기준 (합계 = weightPct = 14.52%)
+  // Chart 1: Project Weight 기준 (합계 = weightPct)
   const wRemain = Math.max(0, weightPct - prog);
   if (_chartWeight) _chartWeight.destroy();
   _chartWeight = new Chart(document.getElementById('chart-weight'), {
