@@ -846,7 +846,7 @@ function renderOverview() {
       labels: discLabels,
       datasets: [
         { label: 'Project Weight (%)', data: discWeightAbs, backgroundColor: '#f472b6', stack: 'weight',   barPercentage: 0.6, categoryPercentage: 1.0, order: 0 },
-        { label: 'Previous Week (%)',  data: discPrevAbs,   backgroundColor: '#3b82f6', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 },
+        { label: 'Previous Week (%)',  data: discPrevAbs,   backgroundColor: '#60a5fa', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 },
         { label: 'This Week (%)',      data: discThisAbs,   backgroundColor: '#22c55e', stack: 'progress', barPercentage: 0.6, categoryPercentage: 1.0, order: 1 }
       ]
     },
@@ -869,12 +869,12 @@ function renderOverview() {
           }
         },
         datalabels: {
-          display: true,
-          anchor: ctx => ctx.datasetIndex === 0 ? 'end' : 'center',
-          align:  ctx => ctx.datasetIndex === 0 ? 'top'  : 'center',
-          formatter: (v) => v > 0.01 ? v.toFixed(3) + '%' : '',
+          display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0.01,
+          anchor: 'end',
+          align: 'top',
+          formatter: (v) => v.toFixed(3) + '%',
           font: { size: 9, weight: '600' },
-          color: ctx => ctx.datasetIndex === 0 ? '#db2777' : '#ffffff',
+          color: ctx => ['#db2777', '#2563eb', '#16a34a'][ctx.datasetIndex],
           offset: 2
         }
       }
