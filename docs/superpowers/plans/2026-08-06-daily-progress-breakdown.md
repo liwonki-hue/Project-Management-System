@@ -444,11 +444,20 @@ git commit -m "feat: 활동 테이블에 펼침 토글 컬럼 추가"
 - Consumes: `getWeekWednesday`, `getWeekThursday`, `fmtWeekDate` (existing, `app.js:25-48`), `progressMap`, `allActivities` (existing globals), `GET /api/jm_daily/<activity_id>` (Task 3).
 - Produces: `getCurrentWeekDates(): string[]` (7 ISO date strings, Thu→Wed), `buildDailyTableHtml(dates, breakdown, editableDate): string`, `renderManualDailyDetail(activityId): string`, `renderPipingDailyDetail(activityId): Promise<string>` — all consumed by Task 6 Step 4's click handler and by Task 7.
 
-- [ ] **Step 1: Add `getCurrentWeekDates()`**
+- [ ] **Step 1: Add `todayISO()` and `getCurrentWeekDates()`**
 
 In `static/js/app.js`, right after `getWeekThursday` (which ends at line 39):
 
 ```javascript
+
+// 로컬 타임존 기준 오늘 날짜 (YYYY-MM-DD) — toISOString()은 UTC 변환으로 날짜가 밀릴 수 있어 사용 금지
+function todayISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 // 이번 주(목~수) 7일의 ISO 날짜 배열 반환
 function getCurrentWeekDates() {
@@ -457,12 +466,17 @@ function getCurrentWeekDates() {
   const dates = [];
   const d = new Date(thu + 'T00:00:00');
   for (let i = 0; i < 7; i++) {
-    dates.push(d.toISOString().slice(0, 10));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    dates.push(`${y}-${m}-${day}`);
     d.setDate(d.getDate() + 1);
   }
   return dates;
 }
 ```
+
+(Note: an earlier implementation pass used `d.toISOString().slice(0, 10)` inside the loop, matching what appeared here originally. That has a real timezone bug — `toISOString()` converts through UTC, which shifts every date backward by one day in any positive-UTC-offset timezone, including KST. This plan already reflects the corrected version, built entirely from local `getFullYear()/getMonth()/getDate()` components, matching the existing `getWeekWednesday()` pattern. `todayISO()` uses the same safe pattern and is consumed by Step 3 below and by Task 7.)
 
 - [ ] **Step 2: Add the expand-toggle `<td>` to the row markup**
 
@@ -510,7 +524,7 @@ function renderManualDailyDetail(activityId) {
   const p          = progressMap[activityId];
   const isCurrentWeek = !!p && p.report_date === reportDate;
   const breakdown  = (isCurrentWeek && p.daily_breakdown) ? p.daily_breakdown : {};
-  const todayStr   = new Date().toISOString().slice(0, 10);
+  const todayStr   = todayISO();
   return buildDailyTableHtml(dates, breakdown, todayStr);
 }
 
@@ -614,7 +628,7 @@ git commit -m "feat: 활동 행 펼침 시 이번 주 일자별 상세 표시"
 - Modify: `static/js/app.js` inside the existing `#table-body` `'change'` listener (the one edited/referenced in Task 6 Step 4 — insert at the very top of that function body)
 
 **Interfaces:**
-- Consumes: `POST /api/save_batch` (existing, `app.py:69`), `progressMap`, `getWeekWednesday` (existing).
+- Consumes: `POST /api/save_batch` (existing, `app.py:69`), `progressMap`, `getWeekWednesday` (existing), `todayISO()` (added in Task 6 Step 1 — reuse it, do not recompute "today" via `.toISOString()`, which has a real timezone bug in positive-UTC-offset zones including KST; see Task 6's note).
 - Produces: `saveDailyEntry(activityId, qty): Promise<object>` — updates `progressMap[activityId]` in place with the new `prev_week_qty`/`this_week_qty`/`daily_breakdown`/`report_date`, matching the shape every other read of `progressMap` already expects.
 
 - [ ] **Step 1: Add `saveDailyEntry`**
@@ -624,7 +638,7 @@ Add this function right after `renderPipingDailyDetail` (added in Task 6 Step 3)
 ```javascript
 
 async function saveDailyEntry(activityId, qty) {
-  const todayStr   = new Date().toISOString().slice(0, 10);
+  const todayStr   = todayISO();
   const reportDate = getWeekWednesday(new Date());
   const existing   = progressMap[activityId];
   const isCurrentWeek = !!existing && existing.report_date === reportDate;
