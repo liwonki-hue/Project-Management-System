@@ -161,28 +161,28 @@ input[type="text"]:focus, select:focus {
 #table-wrap { overflow-x: auto; padding: 16px 24px 24px; }
 
 table {
-  width: 100%; min-width: 1650px; border-collapse: collapse; background: #fff;
+  width: 100%; min-width: 1600px; border-collapse: collapse; background: #fff;
   border-radius: 8px; overflow: hidden;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 thead { background: #f0f4ff; }
 
-/* Column widths — min-width 보장, col-name은 나머지 공간 자동 확장 */
+/* Column widths — 1920px 해상도에서 가로스크롤 없이 전부 보이도록 축소, min-width 보장, col-name은 나머지 공간 자동 확장 */
 .col-expand     { width: 28px;  min-width: 28px; text-align: center; }
-.col-seq        { width: 36px;  min-width: 36px; }
-.col-level      { width: 52px;  min-width: 52px; }
-.col-block      { width: 70px;  min-width: 70px; }
-.col-discipline { width: 80px;  min-width: 80px; }
-.col-area       { width: 130px; min-width: 130px; }
-.col-id         { width: 150px; min-width: 150px; }
-.col-name     { min-width: 200px; }
-.col-weight   { width: 90px;  min-width: 90px; }
-.col-date     { width: 115px; min-width: 115px; }
-.col-unit     { width: 70px;  min-width: 70px;  text-align: center; }
-.col-totalqty { width: 95px;  min-width: 95px; }
-.col-qty      { width: 95px;  min-width: 95px; }
-.col-prog     { width: 110px; min-width: 110px; }
-.col-status   { width: 90px;  min-width: 90px; }
+.col-seq        { width: 32px;  min-width: 32px; }
+.col-level      { width: 46px;  min-width: 46px; }
+.col-block      { width: 62px;  min-width: 62px; }
+.col-discipline { width: 70px;  min-width: 70px; }
+.col-area       { width: 108px; min-width: 108px; }
+.col-id         { width: 132px; min-width: 132px; }
+.col-name     { min-width: 175px; }
+.col-weight   { width: 80px;  min-width: 80px; }
+.col-date     { width: 102px; min-width: 102px; }
+.col-unit     { width: 58px;  min-width: 58px;  text-align: center; }
+.col-totalqty { width: 85px;  min-width: 85px; }
+.col-qty      { width: 85px;  min-width: 85px; }
+.col-prog     { width: 98px;  min-width: 98px; }
+.col-status   { width: 80px;  min-width: 80px; }
 
 th {
   padding: 8px 6px; text-align: center;
