@@ -19,7 +19,7 @@ const DISC_TABS = { mech: 'MECH', piping: 'PIPING', hvac: 'HVAC', ff: 'FF' };
 const PAGE_SIZE = 20;
 let currentPage = 1;
 
-const PROG_FIELDS = ['actual_start', 'actual_finish', 'prev_week_qty', 'this_week_qty'];
+const PROG_FIELDS = ['actual_start', 'actual_finish'];
 
 // 목~수 주간에서 해당 주의 수요일(마감일) 반환 (YYYY-MM-DD, 로컬 날짜 기준)
 function getWeekWednesday(date) {
@@ -365,12 +365,8 @@ function renderTable(data, startIndex = 0, readOnly = false) {
     const totalCell = readOnly
       ? `<td>${act.budgeted_units != null ? Math.round(act.budgeted_units).toLocaleString() : '-'}</td>`
       : `<td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="budgeted_units" data-table="activities" value="${act.budgeted_units != null ? Math.round(act.budgeted_units) : ''}"></td>`;
-    const prevCell = readOnly
-      ? `<td>${prevWk != null && prevWk > 0 ? Math.round(prevWk).toLocaleString() : '-'}</td>`
-      : `<td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="prev_week_qty" data-table="progress" value="${prevWk != null && prevWk > 0 ? Math.round(prevWk) : ''}"></td>`;
-    const thisCell = readOnly
-      ? `<td>${thisWk != null && thisWk > 0 ? Math.round(thisWk).toLocaleString() : '-'}</td>`
-      : `<td><input type="number" class="qty-input" data-id="${act.activity_id}" data-field="this_week_qty" data-table="progress" value="${thisWk != null && thisWk > 0 ? Math.round(thisWk) : ''}"></td>`;
+    const prevCell = `<td class="prev-cell">${prevWk != null && prevWk > 0 ? Math.round(prevWk).toLocaleString() : '-'}</td>`;
+    const thisCell = `<td class="this-cell">${thisWk != null && thisWk > 0 ? Math.round(thisWk).toLocaleString() : '-'}</td>`;
 
     const tr = document.createElement('tr');
     tr.dataset.id = act.activity_id;
@@ -402,9 +398,11 @@ function renderTable(data, startIndex = 0, readOnly = false) {
 // ── Auto-recalc row ──────────────────────────────────────────
 function recalcRow(tr) {
   if (!tr.querySelector('[data-field="budgeted_units"]')) return;
+  const id = tr.dataset.id;
+  const p  = progressMap[id] || {};
   const totalQty = parseFloat(tr.querySelector('[data-field="budgeted_units"]')?.value) || null;
-  const prev     = parseFloat(tr.querySelector('[data-field="prev_week_qty"]')?.value)  || null;
-  const thisWk   = parseFloat(tr.querySelector('[data-field="this_week_qty"]')?.value)  || null;
+  const prev     = p.prev_week_qty != null ? parseFloat(p.prev_week_qty) : null;
+  const thisWk   = p.this_week_qty != null ? parseFloat(p.this_week_qty) : null;
 
   const completed = (prev != null || thisWk != null) ? (prev || 0) + (thisWk || 0) : null;
   const remaining = (totalQty != null && completed != null) ? totalQty - completed : null;
@@ -412,6 +410,8 @@ function recalcRow(tr) {
     ? Math.min(100, (completed / totalQty) * 100) : null;
 
   const fmt = v => v != null ? Math.round(v).toLocaleString() : '-';
+  tr.querySelector('.prev-cell').textContent      = fmt(prev);
+  tr.querySelector('.this-cell').textContent      = fmt(thisWk);
   tr.querySelector('.completed-cell').textContent = fmt(completed);
   tr.querySelector('.remaining-cell').textContent = fmt(remaining);
   tr.querySelector('.progress-cell').innerHTML = pct != null
