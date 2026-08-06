@@ -26,11 +26,16 @@ CREATE TABLE IF NOT EXISTS pms.weekly_progress (
     gap              numeric,
     prev_week_qty    numeric,
     this_week_qty    numeric,
+    daily_breakdown  jsonb DEFAULT '{}'::jsonb,
     actual_total_qty numeric,
     local_staff      int,
     korean_staff     int,
     UNIQUE(activity_id, report_date)
 );
+
+-- 기존 테이블에 daily_breakdown 컬럼 추가 (최초 1회, 이미 있으면 무시)
+ALTER TABLE pms.weekly_progress
+  ADD COLUMN IF NOT EXISTS daily_breakdown jsonb DEFAULT '{}'::jsonb;
 
 -- 역할별 접근 권한
 GRANT USAGE ON SCHEMA pms TO anon, authenticated, service_role;
