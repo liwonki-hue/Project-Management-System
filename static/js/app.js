@@ -799,7 +799,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
   try {
     btn.textContent = '⏳ ...'; btn.disabled = true;
 
-    const thList = [...document.querySelectorAll('#activity-table th')];
+    const thList = [...document.querySelectorAll('#activity-table th')].filter(th => !th.classList.contains('col-expand'));
     const visibleIdx = thList
       .map((th, i) => getComputedStyle(th).display !== 'none' ? i : null)
       .filter(i => i !== null);
