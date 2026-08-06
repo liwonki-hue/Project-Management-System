@@ -156,19 +156,6 @@ function buildProgressMap() {
       progressMap[id] = p;
     }
   }
-
-  // 저장된 report_date가 지난 주(목~수 이전)면 this_week_qty를 prev_week_qty로 이월하고
-  // this_week_qty는 새 주 입력을 위해 비움
-  const curWed = getWeekWednesday(new Date());
-  for (const id in progressMap) {
-    const p = progressMap[id];
-    if (p.report_date && p.report_date < curWed) {
-      const prev  = p.prev_week_qty != null ? parseFloat(p.prev_week_qty) : 0;
-      const this_ = p.this_week_qty != null ? parseFloat(p.this_week_qty) : 0;
-      p.prev_week_qty = (prev + this_) || null;
-      p.this_week_qty = null;
-    }
-  }
 }
 
 // ── Populate Dropdowns ───────────────────────────────────────
