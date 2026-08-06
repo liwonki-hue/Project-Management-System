@@ -156,6 +156,21 @@ function buildProgressMap() {
       progressMap[id] = p;
     }
   }
+
+  // 저장된 report_date가 지난 주(목~수 이전)면 화면 표시용으로만 this_week_qty를
+  // prev_week_qty로 이월(DB에는 쓰지 않음) — 저장 시점 이월(saveDailyEntry)이 아직
+  // 이번 주에 한 번도 실행되지 않은 활동의 KPI가 지난 주 값을 이번 주 값으로
+  // 잘못 표시하는 것을 막기 위함
+  const curWed = getWeekWednesday(new Date());
+  for (const id in progressMap) {
+    const p = progressMap[id];
+    if (p.report_date && p.report_date < curWed) {
+      const prev  = p.prev_week_qty != null ? parseFloat(p.prev_week_qty) : 0;
+      const this_ = p.this_week_qty != null ? parseFloat(p.this_week_qty) : 0;
+      p.prev_week_qty = (prev + this_) || null;
+      p.this_week_qty = null;
+    }
+  }
 }
 
 // ── Populate Dropdowns ───────────────────────────────────────
