@@ -154,3 +154,25 @@ def sync(max_workers: int = 10) -> dict:
         _upsert("weekly_progress", [r["prog_record"] for r in results], on_conflict="activity_id,report_date")
 
     return {"synced": len(results), "failed": failed, "results": results, "report_date": report_date_str}
+
+
+def daily_breakdown_for_activity(activity_id: str) -> dict:
+    """단일 활동의 이번 주(목~수) 일자별 완료 DI 합계 반환 (Piping 전용, 읽기 전용)"""
+    mapping = load_mapping()
+    entry = next((m for m in mapping if m[0] == activity_id), None)
+    if not entry:
+        return {}
+
+    _, jm_system, jm_unit, ratio = entry
+    this_thu, this_wed, _ = week_bounds_thu_wed(date.today())
+
+    joints = fetch_jm(jm_system, jm_unit)
+    breakdown = {}
+    for j in joints:
+        dc = j.get("date_completed")
+        if not dc:
+            continue
+        d = dc[:10]
+        if this_thu.isoformat() <= d <= this_wed.isoformat():
+            breakdown[d] = breakdown.get(d, 0.0) + float(j.get("di") or 0) * ratio
+    return breakdown
