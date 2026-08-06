@@ -66,6 +66,16 @@ def get_progress():
     return jsonify(data)
 
 
+@app.route('/api/jm_daily/<activity_id>')
+def jm_daily(activity_id):
+    try:
+        data = jm_sync.daily_breakdown_for_activity(activity_id)
+        return jsonify(data)
+    except Exception as e:
+        print(f'[jm_daily 오류] {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/save_batch', methods=['POST'])
 def save_batch():
     try:
