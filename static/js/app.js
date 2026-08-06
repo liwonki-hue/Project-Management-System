@@ -497,6 +497,47 @@ async function renderPipingDailyDetail(activityId) {
   }
 }
 
+async function saveDailyEntry(activityId, qty) {
+  const todayStr   = todayISO();
+  const reportDate = getWeekWednesday(new Date());
+  const existing   = progressMap[activityId];
+  const isCurrentWeek = !!existing && existing.report_date === reportDate;
+
+  const breakdown = isCurrentWeek ? { ...(existing.daily_breakdown || {}) } : {};
+  breakdown[todayStr] = qty;
+  const thisWeekQty = Object.values(breakdown).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+
+  const prevWeekQty = isCurrentWeek
+    ? (existing.prev_week_qty != null ? parseFloat(existing.prev_week_qty) : 0)
+    : ((existing?.prev_week_qty != null ? parseFloat(existing.prev_week_qty) : 0) +
+       (existing?.this_week_qty != null ? parseFloat(existing.this_week_qty) : 0));
+
+  const progRecord = {
+    activity_id:     activityId,
+    report_date:     reportDate,
+    exists_in_db:    isCurrentWeek,
+    prev_week_qty:   prevWeekQty,
+    this_week_qty:   thisWeekQty,
+    daily_breakdown: breakdown,
+  };
+
+  const res = await fetch('/api/save_batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activities: [], progress: [progRecord] }),
+  });
+  if (!res.ok) throw new Error(`save_batch HTTP ${res.status}`);
+
+  progressMap[activityId] = {
+    ...(existing || {}),
+    report_date:     reportDate,
+    prev_week_qty:   prevWeekQty,
+    this_week_qty:   thisWeekQty,
+    daily_breakdown: breakdown,
+  };
+  return progressMap[activityId];
+}
+
 // ── Util ────────────────────────────────────────────────────
 function toISODate(val) {
   if (!val) return '';
@@ -564,6 +605,27 @@ document.getElementById('pagination').addEventListener('click', e => {
 });
 
 document.getElementById('table-body').addEventListener('change', async e => {
+  if (e.target.classList.contains('daily-input')) {
+    const input = e.target;
+    const detailTr = input.closest('tr.detail-row');
+    const activityTr = detailTr.previousElementSibling;
+    const activityId = activityTr.dataset.id;
+    const qty = input.value !== '' ? parseFloat(input.value) : 0;
+
+    input.disabled = true;
+    try {
+      await saveDailyEntry(activityId, qty);
+      recalcRow(activityTr);
+      input.classList.add('saved');
+      setTimeout(() => input.classList.remove('saved'), 1200);
+    } catch (err) {
+      console.error('일자별 저장 실패:', err);
+      alert('저장에 실패했습니다: ' + err.message);
+    } finally {
+      input.disabled = false;
+    }
+    return;
+  }
   if (e.target.classList.contains('date-input')) {
     const input      = e.target;
     const activityId = input.dataset.id;
