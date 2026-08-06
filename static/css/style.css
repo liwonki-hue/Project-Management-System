@@ -110,6 +110,22 @@ input[type="text"]:focus, select:focus {
 .qty-input:focus { border-color: #4f8ef7; background: #fff; outline: none; }
 .qty-input::-webkit-inner-spin-button,
 .qty-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.expand-btn {
+  background: none; border: none; cursor: pointer; font-size: 11px;
+  color: #4f8ef7; padding: 2px 4px; line-height: 1;
+}
+.expand-btn:hover { color: #2563eb; }
+.detail-row td { background: #f7faff; padding: 8px 24px; }
+.daily-table { border-collapse: collapse; font-size: 11px; }
+.daily-table th, .daily-table td {
+  border: 1px solid #d0d5dd; padding: 4px 10px; text-align: center; min-width: 70px;
+}
+.daily-table thead { background: #eef2ff; }
+.daily-input {
+  width: 60px; height: 22px; border: 1px solid #d0d5dd; border-radius: 4px;
+  font-size: 11px; text-align: center; background: #fff;
+}
+.daily-input.saved { border-color: #4fc9a4; }
 .area-input { text-align: center; text-transform: uppercase; }
 
 /* ── Pagination ── */

@@ -38,6 +38,19 @@ function getWeekThursday(wedDate) {
   return d.toISOString().slice(0, 10);
 }
 
+// 이번 주(목~수) 7일의 ISO 날짜 배열 반환
+function getCurrentWeekDates() {
+  const wed = getWeekWednesday(new Date());
+  const thu = getWeekThursday(wed);
+  const dates = [];
+  const d = new Date(thu + 'T00:00:00');
+  for (let i = 0; i < 7; i++) {
+    dates.push(d.toISOString().slice(0, 10));
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
 // 날짜를 "MM/DD(요일)" 포맷으로 반환
 function fmtWeekDate(isoDate) {
   const d = new Date(isoDate + 'T00:00:00');
@@ -371,6 +384,7 @@ function renderTable(data, startIndex = 0, readOnly = false) {
     const tr = document.createElement('tr');
     tr.dataset.id = act.activity_id;
     tr.innerHTML = `
+      <td class="td-expand"><button type="button" class="expand-btn" data-id="${act.activity_id}">&#9656;</button></td>
       <td class="td-seq">${seqNo}</td>
       <td>${level}</td>
       <td><span class="unit-badge ${cls}">${blockLabel}</span></td>
@@ -429,6 +443,45 @@ function recalcRow(tr) {
       statusKey = 'ongoing'; statusLabel = 'Ongoing';
     }
     statusCell.innerHTML = `<span class="status-badge status-${statusKey}">${statusLabel}</span>`;
+  }
+}
+
+// ── Daily Breakdown ─────────────────────────────────────────
+function buildDailyTableHtml(dates, breakdown, editableDate) {
+  const headerCells = dates.map(d => `<th>${fmtWeekDate(d)}</th>`).join('');
+  const bodyCells = dates.map(d => {
+    const raw = breakdown[d];
+    const val = raw != null ? Math.round(parseFloat(raw)) : '';
+    if (d === editableDate) {
+      return `<td><input type="number" class="daily-input" data-date="${d}" value="${val}"></td>`;
+    }
+    return `<td>${val !== '' ? val.toLocaleString() : '-'}</td>`;
+  }).join('');
+  return `<div class="daily-breakdown-wrap"><table class="daily-table">
+    <thead><tr>${headerCells}</tr></thead>
+    <tbody><tr>${bodyCells}</tr></tbody>
+  </table></div>`;
+}
+
+function renderManualDailyDetail(activityId) {
+  const dates      = getCurrentWeekDates();
+  const reportDate = getWeekWednesday(new Date());
+  const p          = progressMap[activityId];
+  const isCurrentWeek = !!p && p.report_date === reportDate;
+  const breakdown  = (isCurrentWeek && p.daily_breakdown) ? p.daily_breakdown : {};
+  const todayStr   = new Date().toISOString().slice(0, 10);
+  return buildDailyTableHtml(dates, breakdown, todayStr);
+}
+
+async function renderPipingDailyDetail(activityId) {
+  const dates = getCurrentWeekDates();
+  try {
+    const res = await fetch(`/api/jm_daily/${encodeURIComponent(activityId)}`);
+    const breakdown = res.ok ? await res.json() : {};
+    return buildDailyTableHtml(dates, breakdown, null);
+  } catch (err) {
+    console.error('JM 일자별 조회 실패:', err);
+    return buildDailyTableHtml(dates, {}, null);
   }
 }
 
@@ -559,6 +612,37 @@ document.getElementById('table-body').addEventListener('change', async e => {
     sel.classList.add('saved');
     setTimeout(() => sel.classList.remove('saved'), 1200);
   } catch (err) { console.error('unit_type 저장 실패:', err); }
+});
+
+document.getElementById('table-body').addEventListener('click', async e => {
+  const btn = e.target.closest('.expand-btn');
+  if (!btn) return;
+
+  const tr = btn.closest('tr');
+  const activityId = btn.dataset.id;
+  const next = tr.nextElementSibling;
+  const existingDetail = (next && next.classList.contains('detail-row')) ? next : null;
+
+  if (existingDetail) {
+    const show = existingDetail.style.display === 'none';
+    existingDetail.style.display = show ? '' : 'none';
+    btn.innerHTML = show ? '&#9662;' : '&#9656;';
+    return;
+  }
+
+  btn.innerHTML = '&#9662;';
+  const colCount = tr.children.length;
+  const detailTr = document.createElement('tr');
+  detailTr.className = 'detail-row';
+  detailTr.innerHTML = `<td colspan="${colCount}"><div class="daily-breakdown-wrap">불러오는 중...</div></td>`;
+  tr.after(detailTr);
+
+  const act = allActivities.find(a => a.activity_id === activityId);
+  const isPiping = act && act.department === 'PIPING';
+  const html = isPiping
+    ? await renderPipingDailyDetail(activityId)
+    : renderManualDailyDetail(activityId);
+  detailTr.querySelector('td').innerHTML = html;
 });
 
 // ── Save (batch) ────────────────────────────────────────────
