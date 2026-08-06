@@ -506,6 +506,10 @@ async function saveDailyEntry(activityId, qty) {
     prev_week_qty:   prevWeekQty,
     this_week_qty:   thisWeekQty,
     daily_breakdown: breakdown,
+    ...(isCurrentWeek ? {} : {
+      actual_start:  existing?.actual_start  ?? null,
+      actual_finish: existing?.actual_finish ?? null,
+    }),
   };
 
   const res = await fetch('/api/save_batch', {
@@ -521,6 +525,10 @@ async function saveDailyEntry(activityId, qty) {
     prev_week_qty:   prevWeekQty,
     this_week_qty:   thisWeekQty,
     daily_breakdown: breakdown,
+    ...(isCurrentWeek ? {} : {
+      actual_start:  existing?.actual_start  ?? null,
+      actual_finish: existing?.actual_finish ?? null,
+    }),
   };
   return progressMap[activityId];
 }
