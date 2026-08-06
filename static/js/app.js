@@ -38,6 +38,15 @@ function getWeekThursday(wedDate) {
   return d.toISOString().slice(0, 10);
 }
 
+// 로컬 타임존 기준 오늘 날짜 (YYYY-MM-DD) — toISOString()은 UTC 변환으로 날짜가 밀릴 수 있어 사용 금지
+function todayISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // 이번 주(목~수) 7일의 ISO 날짜 배열 반환
 function getCurrentWeekDates() {
   const wed = getWeekWednesday(new Date());
@@ -472,7 +481,7 @@ function renderManualDailyDetail(activityId) {
   const p          = progressMap[activityId];
   const isCurrentWeek = !!p && p.report_date === reportDate;
   const breakdown  = (isCurrentWeek && p.daily_breakdown) ? p.daily_breakdown : {};
-  const todayStr   = new Date().toISOString().slice(0, 10);
+  const todayStr   = todayISO();
   return buildDailyTableHtml(dates, breakdown, todayStr);
 }
 
