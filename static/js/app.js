@@ -1169,5 +1169,41 @@ document.querySelectorAll('.nav-item').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
+// ── Auto-fit Scale (desktop, >=1280px) ─────────────────────────
+// 1920px 폭 기준으로 만들어진 레이아웃을 실제 뷰포트 크기에 맞춰 비례 확대/축소한다.
+// 세로 기준은 1080 같은 고정값을 가정하지 않고 매번 실제 콘텐츠 높이(scrollHeight)를
+// 측정해서 계산한다 — 탭/행 수/폰트 렌더링에 따라 실제 높이가 달라지므로 고정값을
+// 쓰면 화면마다 하단이 잘리거나 남는 여백이 생길 수 있다.
+// zoom이 걸린 상태에서도 scrollHeight 등 clientWidth류 속성은 항상 zoom 이전(reference)
+// 좌표계 값을 반환하므로, 현재 zoom을 초기화하지 않고 그대로 읽어도 정확하다.
+// 1280px 미만(태블릿)은 style.css의 @media 규칙이 담당하므로 여기서는 건드리지 않는다.
+const SCALE_DESIGN_W = 1920;
+const SCALE_BREAKPOINT = 1280;
+
+function applyScale() {
+  const wrap = document.getElementById('scale-wrap');
+  if (window.innerWidth < SCALE_BREAKPOINT) {
+    wrap.style.zoom = '';
+    return;
+  }
+  const contentHeight = wrap.scrollHeight;
+  const scale = Math.min(window.innerWidth / SCALE_DESIGN_W, window.innerHeight / contentHeight);
+  wrap.style.zoom = scale;
+}
+
+// 창 크기 변경뿐 아니라 탭 전환·필터·페이지 이동 등으로 테이블 내용(=높이)이
+// 바뀔 때마다도 다시 계산해야 하므로, render()/renderOverview() 등 모든 호출부를
+// 일일이 훅킹하는 대신 #scale-wrap의 DOM 변경을 감시해 재계산한다.
+let scaleUpdateTimer = null;
+function scheduleApplyScale() {
+  clearTimeout(scaleUpdateTimer);
+  scaleUpdateTimer = setTimeout(applyScale, 50);
+}
+window.addEventListener('resize', scheduleApplyScale);
+new MutationObserver(scheduleApplyScale).observe(document.getElementById('scale-wrap'), {
+  childList: true, subtree: true, characterData: true,
+});
+applyScale();
+
 // ── Init ────────────────────────────────────────────────────
 loadData();
