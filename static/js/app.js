@@ -16,7 +16,9 @@ let activeTab  = 'overview';
 let reportMode = false;
 const DISC_TABS = { mech: 'MECH', piping: 'PIPING', hvac: 'HVAC', ff: 'FF' };
 
-const PAGE_SIZE = 14;
+const PAGE_SIZE = 13;
+const PAGE_SIZE_REPORT = 17;
+function getPageSize() { return reportMode ? PAGE_SIZE_REPORT : PAGE_SIZE; }
 let currentPage = 1;
 
 const PROG_FIELDS = ['actual_start', 'actual_finish'];
@@ -276,12 +278,13 @@ function getFiltered() {
 // ── Render ──────────────────────────────────────────────────
 function render() {
   const data       = getFiltered();
-  const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
+  const pageSize   = getPageSize();
+  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
   if (currentPage > totalPages) currentPage = 1;
-  const pageData   = data.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageData   = data.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   renderKPIs(allActivities);
-  renderTable(pageData, (currentPage - 1) * PAGE_SIZE, reportMode);
+  renderTable(pageData, (currentPage - 1) * pageSize, reportMode);
   renderPagination(data.length, totalPages);
 }
 
@@ -290,8 +293,9 @@ function renderPagination(total, totalPages) {
   const pag = document.getElementById('pagination');
   if (totalPages <= 1) { pag.innerHTML = ''; return; }
 
-  const start = (currentPage - 1) * PAGE_SIZE + 1;
-  const end   = Math.min(currentPage * PAGE_SIZE, total);
+  const pageSize = getPageSize();
+  const start = (currentPage - 1) * pageSize + 1;
+  const end   = Math.min(currentPage * pageSize, total);
 
   let html = `<span class="pag-info">${start}–${end} / ${total} rows</span>`;
   html += `<button class="pag-btn pag-arrow" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>&lsaquo;</button>`;
