@@ -342,6 +342,11 @@ function fitOverviewHeight() {
   const availableRefHeight = window.innerHeight * SCALE_DESIGN_W / window.innerWidth;
   const target = availableRefHeight - chromeHeight;
   if (target > wrap.offsetHeight) wrap.style.minHeight = target + 'px';
+
+  // min-height 변경은 style 속성 변경이라 MutationObserver(childList/characterData만 감시)가
+  // 감지하지 못한다 — 다른 DOM 변경이 뒤따르지 않는 호출부(예: syncJmInBackground)에서는
+  // 이 재계산이 스케일에 반영되지 않을 수 있으므로 항상 명시적으로 재계산한다.
+  applyScale();
 }
 
 // ── Pagination ───────────────────────────────────────────────
