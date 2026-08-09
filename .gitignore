@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 *.pyo
-Raw File/
+Raw File/*
+!Raw File/JM_Mapping.xlsx
 insert_pms_data.sql
 .streamlit/secrets.toml
