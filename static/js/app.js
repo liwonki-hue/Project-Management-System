@@ -16,8 +16,9 @@ let activeTab  = 'overview';
 let reportMode = false;
 const DISC_TABS = { mech: 'MECH', piping: 'PIPING', hvac: 'HVAC', ff: 'FF' };
 
-const PAGE_SIZE = 13;
-const PAGE_SIZE_REPORT = 17;
+// 초기 추정값 — 실제 화면에 맞는 값은 recalcPageSize()가 렌더링 후 측정해서 덮어쓴다.
+let PAGE_SIZE = 13;
+let PAGE_SIZE_REPORT = 17;
 function getPageSize() { return reportMode ? PAGE_SIZE_REPORT : PAGE_SIZE; }
 let currentPage = 1;
 
@@ -286,6 +287,42 @@ function render() {
   renderKPIs(allActivities);
   renderTable(pageData, (currentPage - 1) * pageSize, reportMode);
   renderPagination(data.length, totalPages);
+}
+
+// 화면에 세로 스크롤바가 생기지 않으면서 빈 공간도 남지 않도록, 실제로 그려진 행
+// 높이와 헤더/필터바/페이지네이션 높이를 측정해 페이지당 행 수를 역산한다.
+// 행 높이는 실제로 그려봐야 알 수 있으므로 render() 이후에만 호출한다.
+// 반환값: 계산된 값이 기존과 달라 PAGE_SIZE(_REPORT)를 갱신했으면 true.
+function recalcPageSize() {
+  if (document.getElementById('tab-pms').style.display === 'none') return false;
+  if (window.innerWidth < SCALE_BREAKPOINT) return false; // 태블릿은 세로 스크롤 허용 대상이라 제외
+
+  const wrap = document.getElementById('scale-wrap');
+  const rows = Array.from(document.querySelectorAll('#table-body tr:not(.detail-row)'));
+  if (!rows.length) return false;
+
+  let rowsHeight = 0;
+  rows.forEach(r => rowsHeight += r.offsetHeight);
+  const avgRowHeight       = rowsHeight / rows.length;
+  const chromeHeight       = wrap.scrollHeight - rowsHeight;
+  const availableRefHeight = window.innerHeight * SCALE_DESIGN_W / window.innerWidth;
+  const newSize = Math.max(1, Math.floor((availableRefHeight - chromeHeight) / avgRowHeight));
+
+  if (reportMode) {
+    if (newSize === PAGE_SIZE_REPORT) return false;
+    PAGE_SIZE_REPORT = newSize;
+  } else {
+    if (newSize === PAGE_SIZE) return false;
+    PAGE_SIZE = newSize;
+  }
+  return true;
+}
+
+// 행 높이는 실제로 한 번 그려봐야 측정할 수 있으므로, 우선 렌더링한 뒤 그 결과로
+// 정확한 페이지당 행 수를 계산해 필요하면 한 번 더 렌더링한다(최대 2회).
+function renderPms() {
+  render();
+  if (recalcPageSize()) render();
 }
 
 // ── Pagination ───────────────────────────────────────────────
@@ -1157,7 +1194,7 @@ function switchTab(tab) {
   if (isPmsTab) {
     selectedDiscipline = DISC_TABS[tab];
     currentPage = 1;
-    render();
+    renderPms();
   } else if (tab === 'overview') {
     selectedDiscipline = '';
     renderOverview();
@@ -1165,7 +1202,7 @@ function switchTab(tab) {
     selectedDiscipline = '';
     document.getElementById('discipline-filter').value = '';
     currentPage = 1;
-    render();
+    renderPms();
   }
 }
 
@@ -1203,9 +1240,20 @@ function scheduleApplyScale() {
   clearTimeout(scaleUpdateTimer);
   scaleUpdateTimer = setTimeout(applyScale, 50);
 }
-window.addEventListener('resize', scheduleApplyScale);
 new MutationObserver(scheduleApplyScale).observe(document.getElementById('scale-wrap'), {
   childList: true, subtree: true, characterData: true,
+});
+
+// 실제 창 크기 변경(resize)에서만 페이지당 행 수를 다시 계산한다 — render()가
+// 만든 DOM 변경은 위 MutationObserver가 이미 감시하므로, 여기서도 매번 재계산하면
+// render() → 감시 → 재계산 → render() 식으로 서로를 계속 건드릴 위험이 있다.
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (recalcPageSize()) render();
+    applyScale();
+  }, 50);
 });
 applyScale();
 
