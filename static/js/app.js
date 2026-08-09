@@ -16,7 +16,7 @@ let activeTab  = 'overview';
 let reportMode = false;
 const DISC_TABS = { mech: 'MECH', piping: 'PIPING', hvac: 'HVAC', ff: 'FF' };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 let currentPage = 1;
 
 const PROG_FIELDS = ['actual_start', 'actual_finish'];
