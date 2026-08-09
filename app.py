@@ -2,12 +2,14 @@
 import time
 from flask import Flask, jsonify, render_template, request
 from flask_compress import Compress
+from flask_cors import CORS
 from concurrent.futures import ThreadPoolExecutor
 import db
 import jm_sync
 
 app = Flask(__name__)
 Compress(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})  # IPCS-CONTROL 등 외부 origin에서 브라우저 fetch로 API 호출 허용
 
 SYNC_JM_CACHE_SECONDS = 300  # 이 시간 내 재요청은 동기화를 건너뛰고 직전 결과를 반환
 _last_sync_jm_at = 0
