@@ -827,6 +827,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
 
   const rows = document.querySelectorAll('#table-body tr');
   const actMap = {}, progMap = {};
+  const actLookup = Object.fromEntries(allActivities.map(a => [a.activity_id, a]));
+  const todayStr = todayISO();
 
   rows.forEach(tr => {
     const id = tr.dataset.id;
@@ -852,10 +854,27 @@ document.getElementById('save-btn').addEventListener('click', async () => {
       if (inp.dataset.table === 'activities') actMap[id][field] = val;
       else progMap[id][field] = val;
     });
+
+    // Actual Start/Finish 자동 입력 — 진행률(수량)이 있는데 Start가 비어있으면 오늘 날짜로,
+    // 완료(수량 >= Total Q'ty)됐는데 Finish가 비어있으면 오늘 날짜로 채운다.
+    // Prev/This Week는 메인 테이블에서 더 이상 편집하지 않으므로(일자별 상세 전용),
+    // 진행률 유무는 이미 저장된 progressMap의 값으로 판단한다.
+    // 사용자가 직접 입력한 값이 있는 행은 건드리지 않는다. 인풋 값도 같이 갱신해 화면에 바로 보이게 한다.
+    const p = progMap[id];
+    const existing = progressMap[id];
+    const compQ = (parseFloat(existing?.prev_week_qty) || 0) + (parseFloat(existing?.this_week_qty) || 0);
+    if (!p.actual_start && compQ > 0) {
+      p.actual_start = todayStr;
+      if (startInp) startInp.value = todayStr;
+    }
+    const totalQ = parseFloat(actMap[id].budgeted_units ?? actLookup[id]?.budgeted_units);
+    if (!p.actual_finish && totalQ > 0 && compQ >= totalQ) {
+      p.actual_finish = todayStr;
+      if (finishInp) finishInp.value = todayStr;
+    }
   });
 
   // DB 원본값과 다른 항목만 전송
-  const actLookup = Object.fromEntries(allActivities.map(a => [a.activity_id, a]));
   const actList = Object.values(actMap).filter(a => {
     const orig = actLookup[a.activity_id] || {};
     return Object.entries(a).some(([k, v]) =>
