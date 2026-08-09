@@ -100,20 +100,20 @@ function getStatus(act) {
 }
 
 // ── Data Load ───────────────────────────────────────────────
+function updateLastUpdatedLabel() {
+  const dates = [...new Set(allProgress.map(p => p.report_date).filter(Boolean))].sort();
+  if (dates.length) {
+    document.getElementById('last-updated').textContent =
+      `Report Date: ${dates[dates.length - 1]} | ${allActivities.length} Activities`;
+  }
+}
+
 async function loadData() {
   const loading   = document.getElementById('loading');
   const tableWrap = document.getElementById('table-wrap');
   loading.style.display   = 'block';
-  loading.textContent     = 'JM 데이터 동기화 중...';
+  loading.textContent     = 'Loading data...';
   tableWrap.style.display = 'none';
-
-  try {
-    await fetch('/api/sync_jm', { method: 'POST' });
-  } catch (err) {
-    console.error('JM 동기화 실패, 기존 데이터로 계속 진행:', err);
-  }
-
-  loading.textContent = 'Loading data...';
 
   try {
     const [actRes, progRes] = await Promise.all([
@@ -135,16 +135,39 @@ async function loadData() {
   loading.style.display   = 'none';
   tableWrap.style.display = 'block';
 
-  const dates = [...new Set(allProgress.map(p => p.report_date).filter(Boolean))].sort();
-  if (dates.length) {
-    document.getElementById('last-updated').textContent =
-      `Report Date: ${dates[dates.length - 1]} | ${allActivities.length} Activities`;
-  }
+  updateLastUpdatedLabel();
 
   render();
   renderOverview();
   updateWeekRangeLabel();
 
+  syncJmInBackground();
+}
+
+// JM 데이터 동기화는 화면 표시를 막지 않고 백그라운드로 실행 —
+// 새로 동기화된 값이 있을 때만(cached가 아니고 synced > 0) 조용히 재조회 후 재렌더링
+async function syncJmInBackground() {
+  try {
+    const res = await fetch('/api/sync_jm', { method: 'POST' });
+    if (!res.ok) return;
+    const result = await res.json();
+    if (!result.ok || result.cached || !result.synced) return;
+
+    const [actRes, progRes] = await Promise.all([
+      fetch('/api/activities'),
+      fetch('/api/progress'),
+    ]);
+    if (!actRes.ok || !progRes.ok) return;
+    allActivities = await actRes.json();
+    allProgress   = await progRes.json();
+
+    buildProgressMap();
+    updateLastUpdatedLabel();
+    render();
+    renderOverview();
+  } catch (err) {
+    console.error('JM 백그라운드 동기화 실패:', err);
+  }
 }
 
 // ── Progress Map ─────────────────────────────────────────────
