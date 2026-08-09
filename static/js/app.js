@@ -1252,8 +1252,14 @@ function applyScale() {
     wrap.style.zoom = '';
     return;
   }
-  const contentHeight = wrap.scrollHeight;
-  const scale = Math.min(window.innerWidth / SCALE_DESIGN_W, window.innerHeight / contentHeight);
+  const scaleW = window.innerWidth / SCALE_DESIGN_W;
+  // Overview는 BOP MECH 등과 달리 행 수를 화면에 맞게 줄일 수 없는 고정 콘텐츠(카드+차트+
+  // 테이블 2개)라, 세로가 짧은 화면 비율에서는 자연 높이가 뷰포트보다 커질 수 있다.
+  // 이때 세로까지 맞추려고 축소하면(scaleH) 가로가 남아 좌우에 빈 여백이 생기므로,
+  // Overview는 항상 가로 기준으로만 맞추고 세로는 필요하면 페이지 스크롤로 넘긴다.
+  const scale = (activeTab === 'overview')
+    ? scaleW
+    : Math.min(scaleW, window.innerHeight / wrap.scrollHeight);
   wrap.style.zoom = scale;
 }
 

@@ -1,8 +1,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #333; font-size: 14px;
-  overflow: hidden;
-  display: flex; align-items: center; justify-content: center;
+  overflow-x: hidden; overflow-y: auto;
+  display: flex; align-items: safe center; justify-content: center;
 }
 
 /* ── Auto-fit scale (desktop, >=1280px) ──
