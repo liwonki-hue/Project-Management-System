@@ -1,5 +1,22 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #333; font-size: 14px; min-width: 900px; overflow: hidden; height: 100vh; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #333; font-size: 14px;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Auto-fit scale (desktop, >=1280px) ──
+   1920x1080 기준으로 만들어진 레이아웃을 뷰포트 크기에 맞춰 JS(app.js: applyScale)가
+   zoom으로 비례 확대/축소한다. transform: scale()은 레이아웃에 반영되지 않아
+   Chart.js 등 getBoundingClientRect 기반으로 컨테이너 크기를 재는 라이브러리가
+   실제 화면 크기와 어긋나게 측정해 캔버스가 계속 커지는 문제가 있었음 — zoom은
+   레이아웃 자체를 재계산하므로 이 문제가 없다. 태블릿 구간은 아래 @media에서 해제된다. */
+#scale-wrap {
+  width: 1920px; height: 1080px;
+  display: flex; flex-direction: column;
+  flex-shrink: 0;
+  background: #f5f7fa;
+}
 
 /* ── Header ── */
 header {
@@ -253,7 +270,8 @@ td:has(.unit-select) { padding: 4px 6px; text-align: center; }
 /* ── Layout ── */
 .layout {
   display: flex;
-  height: calc(100vh - 46px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -331,6 +349,10 @@ td:has(.unit-select) { padding: 4px 6px; text-align: center; }
 .ov-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #555; }
 .ov-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .ov-chart-canvas-wrap { position: relative; height: 180px; }
+/* Chart.js가 getBoundingClientRect()로 컨테이너 크기를 측정하는데, zoom 적용 중에는
+   그 값이 실제 화면 픽셀 기준이라 캔버스에 그대로 다시 쓰면 계속 부풀어난다.
+   !important로 항상 컨테이너에 맞추도록 강제해 무한 확대를 막는다. */
+.ov-chart-canvas-wrap canvas { width: 100% !important; height: 100% !important; }
 .ov-disc-card { flex: 1.68; }
 .kpi-lbl-paren { font-size: 11px; font-weight: 500; color: #6b7280; text-transform: none; letter-spacing: 0; }
 .kpi-lbl-paren span { font-weight: 700; color: #1e40af; }
@@ -377,5 +399,29 @@ td:has(.unit-select) { padding: 4px 6px; text-align: center; }
 #activity-table.report-mode td:nth-child(5),
 #activity-table.report-mode td:nth-child(6) {
   display: none;
+}
+
+/* ── Tablet (< 1280px): auto-fit scale 해제, 레이아웃 재배치 ── */
+@media (max-width: 1279px) {
+  body { overflow: auto; display: block; }
+
+  #scale-wrap {
+    width: auto; height: auto;
+    display: block; zoom: 1 !important;
+  }
+  .layout { height: auto; }
+
+  /* 사이드바 아이콘 전용 */
+  .sidebar { width: 56px; min-width: 56px; }
+  .sidebar-brand-text, .sidebar-section-lbl, .nav-item span:not(.nav-icon) { display: none; }
+  .nav-item { justify-content: center; padding: 11px 0; }
+
+  /* KPI 카드 2열 줄바꿈 */
+  .kpi-area { flex-wrap: wrap; row-gap: 14px; }
+  .kpi-group-wrap { flex-basis: 46%; }
+  .kpi-divider { display: none; }
+
+  /* Overview 차트 3개 세로 스택 */
+  .ov-charts-row { flex-direction: column; }
 }
 

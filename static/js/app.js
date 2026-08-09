@@ -1169,5 +1169,29 @@ document.querySelectorAll('.nav-item').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
+// ── Auto-fit Scale (desktop, >=1280px) ─────────────────────────
+// 1920x1080 기준으로 만들어진 레이아웃을 실제 뷰포트 크기에 맞춰 비례 확대/축소한다.
+// 1280px 미만(태블릿)은 style.css의 @media 규칙이 담당하므로 여기서는 건드리지 않는다.
+const SCALE_DESIGN_W = 1920;
+const SCALE_DESIGN_H = 1080;
+const SCALE_BREAKPOINT = 1280;
+
+function applyScale() {
+  const wrap = document.getElementById('scale-wrap');
+  if (window.innerWidth < SCALE_BREAKPOINT) {
+    wrap.style.zoom = '';
+    return;
+  }
+  const scale = Math.min(window.innerWidth / SCALE_DESIGN_W, window.innerHeight / SCALE_DESIGN_H);
+  wrap.style.zoom = scale;
+}
+
+let scaleResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(scaleResizeTimer);
+  scaleResizeTimer = setTimeout(applyScale, 100);
+});
+applyScale();
+
 // ── Init ────────────────────────────────────────────────────
 loadData();
