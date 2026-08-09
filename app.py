@@ -56,14 +56,22 @@ def sync_jm():
 
 @app.route('/api/activities')
 def get_activities():
-    data = db.select('activities', order='activity_id.asc')
-    return jsonify(data)
+    try:
+        data = db.select('activities', order='activity_id.asc')
+        return jsonify(data)
+    except Exception as e:
+        print(f'[activities 오류] {e}')
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/progress')
 def get_progress():
-    data = db.select('weekly_progress', order='report_date.desc')
-    return jsonify(data)
+    try:
+        data = db.select('weekly_progress', order='report_date.desc')
+        return jsonify(data)
+    except Exception as e:
+        print(f'[progress 오류] {e}')
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/jm_daily/<activity_id>')
@@ -138,8 +146,12 @@ def update_dates(activity_id):
     data = {k: (body[k] or None) for k in ('actual_start', 'actual_finish') if k in body}
     if not data:
         return jsonify({'error': 'no fields'}), 400
-    result = db.patch('weekly_progress', data, activity_id=activity_id)
-    return jsonify(result)
+    try:
+        result = db.patch('weekly_progress', data, activity_id=activity_id)
+        return jsonify(result)
+    except Exception as e:
+        print(f'[update_dates 오류] {e}')
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/activities/<activity_id>/unit_type', methods=['PATCH'])
@@ -148,8 +160,12 @@ def update_unit_type(activity_id):
     unit_type = body.get('unit_type', '')
     if unit_type not in ('DI', '%', 'EA'):
         return jsonify({'error': 'invalid unit_type'}), 400
-    result = db.patch('activities', {'unit_type': unit_type}, activity_id=activity_id)
-    return jsonify(result)
+    try:
+        result = db.patch('activities', {'unit_type': unit_type}, activity_id=activity_id)
+        return jsonify(result)
+    except Exception as e:
+        print(f'[update_unit_type 오류] {e}')
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
