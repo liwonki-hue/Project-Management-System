@@ -314,7 +314,10 @@ td:has(.unit-select) { padding: 4px 6px; text-align: center; }
 }
 
 /* ── Overview ── */
-.overview-wrap { padding: 16px 24px; display: flex; flex-direction: column; gap: 24px; }
+/* min-height는 JS(app.js: fitOverviewHeight)가 화면 높이에 맞춰 지정 —
+   콘텐츠가 화면보다 낮을 때 justify-content가 남는 공간을 섹션 사이 여백으로 고르게 분배해
+   하단에 빈 공간이 뭉쳐 남지 않도록 한다. */
+.overview-wrap { padding: 16px 24px; display: flex; flex-direction: column; gap: 24px; justify-content: space-between; }
 .overview-section {}
 .overview-title {
   font-size: 13px; font-weight: 700; color: #1d4ed8;

@@ -142,6 +142,7 @@ async function loadData() {
 
   render();
   renderOverview();
+  fitOverviewHeight();
   updateWeekRangeLabel();
 
   syncJmInBackground();
@@ -168,6 +169,7 @@ async function syncJmInBackground() {
     updateLastUpdatedLabel();
     render();
     renderOverview();
+    fitOverviewHeight();
   } catch (err) {
     console.error('JM 백그라운드 동기화 실패:', err);
   }
@@ -323,6 +325,23 @@ function recalcPageSize() {
 function renderPms() {
   render();
   if (recalcPageSize()) render();
+}
+
+// Overview 탭은 채울 행이 없어 콘텐츠가 화면보다 낮으면 하단에 빈 공간이 남는다.
+// 남는 공간만큼 .overview-wrap의 min-height를 늘려주면, CSS의
+// justify-content: space-between이 그 여백을 섹션 사이에 고르게 나눠준다.
+function fitOverviewHeight() {
+  if (document.getElementById('tab-overview').style.display === 'none') return;
+  const wrap = document.querySelector('.overview-wrap');
+  if (!wrap) return;
+  wrap.style.minHeight = ''; // 이전 보정값을 지우고 자연 높이부터 다시 측정
+  if (window.innerWidth < SCALE_BREAKPOINT) return; // 태블릿은 세로 스크롤 허용 대상이라 제외
+
+  const scaleWrap     = document.getElementById('scale-wrap');
+  const chromeHeight  = scaleWrap.scrollHeight - wrap.offsetHeight;
+  const availableRefHeight = window.innerHeight * SCALE_DESIGN_W / window.innerWidth;
+  const target = availableRefHeight - chromeHeight;
+  if (target > wrap.offsetHeight) wrap.style.minHeight = target + 'px';
 }
 
 // ── Pagination ───────────────────────────────────────────────
@@ -1198,6 +1217,7 @@ function switchTab(tab) {
   } else if (tab === 'overview') {
     selectedDiscipline = '';
     renderOverview();
+    fitOverviewHeight();
   } else if (tab === 'report') {
     selectedDiscipline = '';
     document.getElementById('discipline-filter').value = '';
@@ -1252,6 +1272,7 @@ window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     if (recalcPageSize()) render();
+    fitOverviewHeight();
     applyScale();
   }, 50);
 });
