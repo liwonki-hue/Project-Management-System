@@ -549,12 +549,20 @@ function recalcRow(tr) {
 }
 
 // ── Daily Breakdown ─────────────────────────────────────────
-function buildDailyTableHtml(dates, breakdown, editableDate) {
+// 일자별 실적 중 수량이 입력된 가장 빠른 날짜(YYYY-MM-DD)를 반환 — 없으면 null
+function earliestPositiveDate(breakdown) {
+  return Object.keys(breakdown || {})
+    .filter(d => (parseFloat(breakdown[d]) || 0) > 0)
+    .sort()[0] || null;
+}
+
+function buildDailyTableHtml(dates, breakdown, editableDates) {
+  const editableSet = editableDates ? new Set(editableDates) : null;
   const headerCells = dates.map(d => `<th>${fmtWeekDate(d)}</th>`).join('');
   const bodyCells = dates.map(d => {
     const raw = breakdown[d];
     const val = raw != null ? Math.round(parseFloat(raw)) : '';
-    if (d === editableDate) {
+    if (editableSet && editableSet.has(d)) {
       return `<td><input type="number" class="daily-input" data-date="${d}" value="${val}"></td>`;
     }
     return `<td>${val !== '' ? val.toLocaleString() : '-'}</td>`;
@@ -571,8 +579,7 @@ function renderManualDailyDetail(activityId) {
   const p          = progressMap[activityId];
   const isCurrentWeek = !!p && p.report_date === reportDate;
   const breakdown  = (isCurrentWeek && p.daily_breakdown) ? p.daily_breakdown : {};
-  const todayStr   = todayISO();
-  return buildDailyTableHtml(dates, breakdown, todayStr);
+  return buildDailyTableHtml(dates, breakdown, dates);
 }
 
 async function renderPipingDailyDetail(activityId) {
@@ -587,20 +594,25 @@ async function renderPipingDailyDetail(activityId) {
   }
 }
 
-async function saveDailyEntry(activityId, qty) {
+async function saveDailyEntry(activityId, date, qty) {
   const todayStr   = todayISO();
   const reportDate = getWeekWednesday(new Date());
   const existing   = progressMap[activityId];
   const isCurrentWeek = !!existing && existing.report_date === reportDate;
 
   const breakdown = isCurrentWeek ? { ...(existing.daily_breakdown || {}) } : {};
-  breakdown[todayStr] = qty;
+  breakdown[date] = qty;
   const thisWeekQty = Object.values(breakdown).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
 
   const prevWeekQty = isCurrentWeek
     ? (existing.prev_week_qty != null ? parseFloat(existing.prev_week_qty) : 0)
     : ((existing?.prev_week_qty != null ? parseFloat(existing.prev_week_qty) : 0) +
        (existing?.this_week_qty != null ? parseFloat(existing.this_week_qty) : 0));
+
+  // Actual Start 자동 입력 — 아직 비어있는데 진행 수량이 생기면 실제 입력된 일자 중 가장 빠른 날짜로 채운다.
+  const completedQty = prevWeekQty + thisWeekQty;
+  const actualStart  = existing?.actual_start
+    || (completedQty > 0 ? (earliestPositiveDate(breakdown) || todayStr) : null);
 
   const progRecord = {
     activity_id:     activityId,
@@ -609,10 +621,8 @@ async function saveDailyEntry(activityId, qty) {
     prev_week_qty:   prevWeekQty,
     this_week_qty:   thisWeekQty,
     daily_breakdown: breakdown,
-    ...(isCurrentWeek ? {} : {
-      actual_start:  existing?.actual_start  ?? null,
-      actual_finish: existing?.actual_finish ?? null,
-    }),
+    actual_start:    actualStart,
+    actual_finish:   existing?.actual_finish ?? null,
   };
 
   const res = await fetch('/api/save_batch', {
@@ -628,10 +638,8 @@ async function saveDailyEntry(activityId, qty) {
     prev_week_qty:   prevWeekQty,
     this_week_qty:   thisWeekQty,
     daily_breakdown: breakdown,
-    ...(isCurrentWeek ? {} : {
-      actual_start:  existing?.actual_start  ?? null,
-      actual_finish: existing?.actual_finish ?? null,
-    }),
+    actual_start:    actualStart,
+    actual_finish:   existing?.actual_finish ?? null,
   };
   return progressMap[activityId];
 }
@@ -708,11 +716,18 @@ document.getElementById('table-body').addEventListener('change', async e => {
     const detailTr = input.closest('tr.detail-row');
     const activityTr = detailTr.previousElementSibling;
     const activityId = activityTr.dataset.id;
+    const date = input.dataset.date;
     const qty = input.value !== '' ? parseFloat(input.value) : 0;
 
     input.disabled = true;
     try {
-      await saveDailyEntry(activityId, qty);
+      const updated = await saveDailyEntry(activityId, date, qty);
+      const startInp = activityTr.querySelector('[data-field="actual_start"]');
+      if (startInp) {
+        const startVal = toISODate(updated.actual_start);
+        startInp.value = startVal;
+        startInp.classList.toggle('has-val', !!startVal);
+      }
       recalcRow(activityTr);
       input.classList.add('saved');
       setTimeout(() => input.classList.remove('saved'), 1200);
@@ -855,7 +870,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
       else progMap[id][field] = val;
     });
 
-    // Actual Start/Finish 자동 입력 — 진행률(수량)이 있는데 Start가 비어있으면 오늘 날짜로,
+    // Actual Start/Finish 자동 입력 — 진행률(수량)이 있는데 Start가 비어있으면
+    // 일자별로 입력된 데이터 중 가장 빠른 날짜로(없으면 오늘 날짜로) 채우고,
     // 완료(수량 >= Total Q'ty)됐는데 Finish가 비어있으면 오늘 날짜로 채운다.
     // Prev/This Week는 메인 테이블에서 더 이상 편집하지 않으므로(일자별 상세 전용),
     // 진행률 유무는 이미 저장된 progressMap의 값으로 판단한다.
@@ -864,8 +880,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     const existing = progressMap[id];
     const compQ = (parseFloat(existing?.prev_week_qty) || 0) + (parseFloat(existing?.this_week_qty) || 0);
     if (!p.actual_start && compQ > 0) {
-      p.actual_start = todayStr;
-      if (startInp) startInp.value = todayStr;
+      p.actual_start = earliestPositiveDate(existing?.daily_breakdown) || todayStr;
+      if (startInp) startInp.value = p.actual_start;
     }
     const totalQ = parseFloat(actMap[id].budgeted_units ?? actLookup[id]?.budgeted_units);
     if (!p.actual_finish && totalQ > 0 && compQ >= totalQ) {
