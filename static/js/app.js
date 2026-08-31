@@ -69,7 +69,7 @@ function getCurrentWeekDates() {
 // 날짜를 "MM/DD(요일)" 포맷으로 반환
 function fmtWeekDate(isoDate) {
   const d = new Date(isoDate + 'T00:00:00');
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${mm}/${dd}(${days[d.getDay()]})`;
