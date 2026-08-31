@@ -306,7 +306,7 @@ function recalcPageSize() {
   let rowsHeight = 0;
   rows.forEach(r => rowsHeight += r.offsetHeight);
   const avgRowHeight       = rowsHeight / rows.length;
-  const chromeHeight       = wrap.scrollHeight - rowsHeight;
+  const chromeHeight       = scaleWrapContentHeight(wrap) - rowsHeight;
   const availableRefHeight = window.innerHeight * SCALE_DESIGN_W / window.innerWidth;
   const newSize = Math.max(1, Math.floor((availableRefHeight - chromeHeight) / avgRowHeight));
 
@@ -1281,6 +1281,20 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 const SCALE_DESIGN_W = 1920;
 const SCALE_BREAKPOINT = 1280;
 
+// 일자별 실적 입력을 위해 펼친 상세 행(.detail-row)은 사용자가 데이터를 입력하는 동안
+// 열려 있는 일시적인 상태일 뿐, 화면 해상도가 바뀐 것이 아니다. 이 높이까지 스케일
+// 계산에 포함시키면 행을 펼치고 접을 때마다 전체 페이지 배율이 흔들려(축소/원복) 화면이
+// 불안정해 보인다(예: 1920x1000에서 행 하나만 펼쳐도 zoom 1.111 → 1.041). 그래서 스케일/
+// 페이지당 행 수 계산에서는 펼쳐진 상세 행의 높이를 제외하고, 그로 인해 콘텐츠가 뷰포트를
+// 넘치면 Overview와 동일하게 body의 overflow-y: auto로 페이지 스크롤을 허용한다.
+function scaleWrapContentHeight(wrap) {
+  let detailHeight = 0;
+  wrap.querySelectorAll('.detail-row').forEach(r => {
+    if (r.style.display !== 'none') detailHeight += r.offsetHeight;
+  });
+  return wrap.scrollHeight - detailHeight;
+}
+
 function applyScale() {
   const wrap = document.getElementById('scale-wrap');
   if (window.innerWidth < SCALE_BREAKPOINT) {
@@ -1294,7 +1308,7 @@ function applyScale() {
   // Overview는 항상 가로 기준으로만 맞추고 세로는 필요하면 페이지 스크롤로 넘긴다.
   const scale = (activeTab === 'overview')
     ? scaleW
-    : Math.min(scaleW, window.innerHeight / wrap.scrollHeight);
+    : Math.min(scaleW, window.innerHeight / scaleWrapContentHeight(wrap));
   wrap.style.zoom = scale;
 }
 
