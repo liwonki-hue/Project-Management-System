@@ -825,8 +825,11 @@ document.getElementById('table-body').addEventListener('click', async e => {
   tr.after(detailTr);
 
   const act = allActivities.find(a => a.activity_id === activityId);
-  const isPiping = act && act.department === 'PIPING';
-  const html = isPiping
+  // PIPING은 기본적으로 Joint Master 연동 자동 집계(JM 매핑에 있는 DI 활동)를 쓰지만,
+  // Leak Test/Air Blowing처럼 JM 매핑에 없어 unit_type이 '%'로 지정된 활동은 자동 집계
+  // 대상이 아니므로 MECH/FF와 동일하게 수동 입력 UI를 쓴다.
+  const useJmSync = act && act.department === 'PIPING' && act.unit_type !== '%';
+  const html = useJmSync
     ? await renderPipingDailyDetail(activityId)
     : renderManualDailyDetail(activityId);
   detailTr.querySelector('td').innerHTML = html;
