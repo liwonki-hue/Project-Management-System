@@ -19,15 +19,28 @@ _session = requests.Session()
 _session.headers.update(_HEADERS)
 
 
+_PAGE_SIZE = 1000  # Supabase 프로젝트의 기본 Max Rows(1000) 설정에 걸려 일부만 조회되는 것을 막기 위한 명시적 페이지네이션
+
+
 def select(table, columns="*", order=None, **eq_filters):
     params = {"select": columns}
     if order:
         params["order"] = order
     for k, v in eq_filters.items():
         params[k] = f"eq.{v}"
-    r = _session.get(f"{_BASE}/{table}", params=params, timeout=30)
-    r.raise_for_status()
-    return r.json()
+
+    rows = []
+    offset = 0
+    while True:
+        headers = {"Range-Unit": "items", "Range": f"{offset}-{offset + _PAGE_SIZE - 1}"}
+        r = _session.get(f"{_BASE}/{table}", params=params, headers=headers, timeout=30)
+        r.raise_for_status()
+        page = r.json()
+        rows.extend(page)
+        if len(page) < _PAGE_SIZE:
+            break
+        offset += _PAGE_SIZE
+    return rows
 
 
 def patch(table, data, **eq_filters):
