@@ -59,13 +59,11 @@ header h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.2px; color: #1e
 .kpi-card.c3 { border-color: #4fc9a4; }
 .kpi-card.c4 { border-color: #9b6bf7; }
 .kpi-card.c5 { border-color: #06b6d4; }
-.kpi-card.c6 { border-color: #f43f5e; }
 .kpi-card.c7 { border-color: #84cc16; }
 .kpi-card.c8  { border-color: #0ea5e9; }
 .kpi-card.c9  { border-color: #f59e0b; }
 .kpi-card.c10 { border-color: #fb7185; }
 .kpi-card.c11 { border-color: #f97316; }
-.kpi-card.c12 { border-color: #8b5cf6; }
 
 .kpi-clickable { cursor: pointer; transition: box-shadow 0.15s, background 0.15s; }
 .kpi-clickable:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.13); }
@@ -146,7 +144,6 @@ input[type="text"]:focus, select:focus {
 .daily-input.saved { border-color: #4fc9a4; }
 .daily-input::-webkit-inner-spin-button,
 .daily-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-.area-input { text-align: center; text-transform: uppercase; }
 
 /* ── Pagination ── */
 .pagination {
