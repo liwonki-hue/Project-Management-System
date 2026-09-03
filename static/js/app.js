@@ -14,6 +14,7 @@ let selectedKpiAct     = '';   // '' | 'prev' | 'this' | 'new'
 
 let activeTab  = 'overview';
 let reportMode = false;
+let reportAsOfDate = todayISO(); // Weekly Report 탭에서 선택한 출력 기준일(YYYY-MM-DD) — 그 날짜가 속한 주를 재출력
 const DISC_TABS = { mech: 'MECH', piping: 'PIPING', hvac: 'HVAC', ff: 'FF' };
 
 // 초기 추정값 — 실제 화면에 맞는 값은 recalcPageSize()가 렌더링 후 측정해서 덮어쓴다.
@@ -75,8 +76,8 @@ function fmtWeekDate(isoDate) {
   return `${mm}/${dd}(${days[d.getDay()]})`;
 }
 
-function updateWeekRangeLabel() {
-  const wed = getWeekWednesday(new Date());
+function updateWeekRangeLabel(refDate = new Date()) {
+  const wed = getWeekWednesday(refDate);
   const thu = getWeekThursday(wed);
   const label = `${fmtWeekDate(thu)} ~ ${fmtWeekDate(wed)}`;
   document.querySelectorAll('.kpi-week-range').forEach(el => { el.textContent = label; });
@@ -176,27 +177,34 @@ async function syncJmInBackground() {
 }
 
 // ── Progress Map ─────────────────────────────────────────────
-function buildProgressMap() {
+// targetWed(YYYY-MM-DD, 해당 주 수요일)를 주면 그 주 "이하" 중 활동별 최신 레코드로
+// progressMap을 구성한다(Weekly Report 탭의 과거 주차 재출력용). 생략하면 이력 전체에서
+// 활동별 최신 레코드를 쓰는 현재 시점(live) 기준이 된다 — 저장 로직이 항상 "오늘이 속한
+// 주"로 report_date를 매기므로 오늘 기준으로는 두 방식이 동일한 결과를 낸다.
+let progressMapAsOf = null; // null = 현재 시점, 문자열이면 재출력 중인 과거 주차의 기준 수요일
+
+function buildProgressMap(targetWed) {
+  progressMapAsOf = targetWed || null;
   progressMap = {};
   for (const p of allProgress) {
+    if (targetWed && p.report_date > targetWed) continue;
     const id = p.activity_id;
     if (!progressMap[id] || p.report_date > progressMap[id].report_date) {
       progressMap[id] = p;
     }
   }
 
-  // 저장된 report_date가 지난 주(목~수 이전)면 화면 표시용으로만 this_week_qty를
-  // prev_week_qty로 이월(DB에는 쓰지 않음) — 저장 시점 이월(saveDailyEntry)이 아직
-  // 이번 주에 한 번도 실행되지 않은 활동의 KPI가 지난 주 값을 이번 주 값으로
-  // 잘못 표시하는 것을 막기 위함
-  const curWed = getWeekWednesday(new Date());
+  // 저장된 report_date가 기준 주(목~수) 이전이면 화면 표시용으로만 this_week_qty를
+  // prev_week_qty로 이월(DB·allProgress 원본은 변경하지 않고 새 객체로 대체) — 저장 시점
+  // 이월(saveDailyEntry)이 아직 기준 주에 한 번도 실행되지 않은 활동의 KPI가 지난 주 값을
+  // 이번 주 값으로 잘못 표시하는 것을 막기 위함
+  const refWed = targetWed || getWeekWednesday(new Date());
   for (const id in progressMap) {
     const p = progressMap[id];
-    if (p.report_date && p.report_date < curWed) {
+    if (p.report_date && p.report_date < refWed) {
       const prev  = p.prev_week_qty != null ? parseFloat(p.prev_week_qty) : 0;
       const this_ = p.this_week_qty != null ? parseFloat(p.this_week_qty) : 0;
-      p.prev_week_qty = (prev + this_) || null;
-      p.this_week_qty = null;
+      progressMap[id] = { ...p, prev_week_qty: (prev + this_) || null, this_week_qty: null };
     }
   }
 }
@@ -701,6 +709,21 @@ document.getElementById('activity-id-filter').addEventListener('change', e => {
 document.getElementById('status-filter').addEventListener('change', e => {
   selectedStatus = e.target.value; currentPage = 1; render();
 });
+
+// Weekly Report 출력 기준일 — 오늘 기준 지난 7일(이번 주 또는 직전 주) 내에서만 선택 가능
+{
+  const reportDateInput = document.getElementById('report-date-input');
+  const today = new Date();
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 6);
+  const fmtISO = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  reportDateInput.min = fmtISO(weekAgo);
+  reportDateInput.max = fmtISO(today);
+  reportDateInput.value = reportAsOfDate;
+  reportDateInput.addEventListener('change', e => {
+    if (!e.target.value) return;
+    applyReportAsOfDate(e.target.value);
+  });
+}
 
 document.getElementById('pagination').addEventListener('click', e => {
   const btn = e.target.closest('.pag-btn');
@@ -1234,6 +1257,16 @@ function renderOverview() {
 }
 
 // ── Tab switching ─────────────────────────────────────────────
+// Weekly Report 탭에서 고른 날짜가 속한 주(목~수)로 progressMap을 재구성해 그 주 데이터를
+// 다시 출력할 수 있게 한다. dateStr이 이번 주에 해당하면 결과적으로 현재 시점과 동일하다.
+function applyReportAsOfDate(dateStr) {
+  reportAsOfDate = dateStr;
+  const refDate = new Date(dateStr + 'T00:00:00');
+  buildProgressMap(getWeekWednesday(refDate));
+  renderPms();
+  updateWeekRangeLabel(refDate);
+}
+
 function switchTab(tab) {
   activeTab  = tab;
   reportMode = (tab === 'report');
@@ -1252,6 +1285,13 @@ function switchTab(tab) {
   const hideDiscArea = isPmsTab || reportMode;
   document.getElementById('discipline-filter-group').style.display = hideDiscArea ? 'none' : '';
   document.getElementById('area-filter-group').style.display       = reportMode   ? 'none' : '';
+  document.getElementById('report-date-group').style.display       = reportMode   ? '' : 'none';
+
+  // Report 탭에서 과거 주차를 보던 중 다른 탭으로 이동하면 현재 시점 데이터로 복원
+  if (!reportMode && progressMapAsOf) {
+    buildProgressMap();
+    updateWeekRangeLabel();
+  }
 
   if (isPmsTab) {
     selectedDiscipline = DISC_TABS[tab];
@@ -1265,7 +1305,8 @@ function switchTab(tab) {
     selectedDiscipline = '';
     document.getElementById('discipline-filter').value = '';
     currentPage = 1;
-    renderPms();
+    document.getElementById('report-date-input').value = reportAsOfDate;
+    applyReportAsOfDate(reportAsOfDate);
   }
 }
 
