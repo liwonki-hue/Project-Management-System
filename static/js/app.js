@@ -166,7 +166,10 @@ async function syncJmInBackground() {
     allActivities = await actRes.json();
     allProgress   = await progRes.json();
 
-    buildProgressMap();
+    // Weekly Report에서 과거 주차("As Of")를 보던 중이면 그 기준을 유지한 채로 갱신 —
+    // 그러지 않으면 백그라운드 동기화가 사용자가 보고 있던 과거 주차 화면을 조용히
+    // 현재 시점 데이터로 되돌려버릴 수 있다.
+    buildProgressMap(progressMapAsOf || undefined);
     updateLastUpdatedLabel();
     render();
     renderOverview();
