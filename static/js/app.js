@@ -559,6 +559,16 @@ function recalcRow(tr) {
   }
 }
 
+// Completed Q'ty가 Total Q'ty를 초과하면 입력 실수를 알리는 메시지 출력
+function warnIfOverTotal(tr) {
+  const p         = progressMap[tr.dataset.id] || {};
+  const totalQty  = parseFloat(tr.querySelector('[data-field="budgeted_units"]')?.value);
+  const completed = (parseFloat(p.prev_week_qty) || 0) + (parseFloat(p.this_week_qty) || 0);
+  if (totalQty > 0 && completed > totalQty) {
+    alert(`Completed Q'ty(${Math.round(completed).toLocaleString()})가 Total Q'ty(${Math.round(totalQty).toLocaleString()})를 초과했습니다.\nActivity: ${tr.dataset.id}\n입력값을 확인해 주세요.`);
+  }
+}
+
 // ── Daily Breakdown ─────────────────────────────────────────
 // 일자별 실적 중 수량이 입력된 가장 빠른 날짜(YYYY-MM-DD)를 반환 — 없으면 null
 function earliestPositiveDate(breakdown) {
@@ -757,6 +767,7 @@ document.getElementById('table-body').addEventListener('change', async e => {
       recalcRow(activityTr);
       input.classList.add('saved');
       setTimeout(() => input.classList.remove('saved'), 1200);
+      warnIfOverTotal(activityTr);
     } catch (err) {
       console.error('일자별 저장 실패:', err);
       alert('저장에 실패했습니다: ' + err.message);
@@ -786,7 +797,9 @@ document.getElementById('table-body').addEventListener('change', async e => {
     return;
   }
   if (e.target.classList.contains('qty-input')) {
-    recalcRow(e.target.closest('tr'));
+    const tr = e.target.closest('tr');
+    recalcRow(tr);
+    warnIfOverTotal(tr);
     return;
   }
   if (!e.target.classList.contains('unit-select')) return;
