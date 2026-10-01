@@ -156,12 +156,13 @@ def sync(max_workers: int = 10) -> dict:
     return {"synced": len(results), "failed": failed, "results": results, "report_date": report_date_str}
 
 
-def daily_breakdown_for_activity(activity_id: str) -> dict:
-    """단일 활동의 이번 주(목~수) 일자별 완료 DI 합계 반환 (Piping 전용, 읽기 전용)"""
+def daily_breakdown_for_activity(activity_id: str) -> dict | None:
+    """단일 활동의 이번 주(목~수) 일자별 완료 DI 합계 반환 (Piping 전용, 읽기 전용).
+    활성 JM 매핑에 없는 활동이면 None — 자동 동기화 대상이 아니므로 수동 입력 대상이다."""
     mapping = load_mapping()
     entry = next((m for m in mapping if m[0] == activity_id), None)
     if not entry:
-        return {}
+        return None
 
     _, jm_system, jm_unit, ratio = entry
     this_thu, this_wed, _ = week_bounds_thu_wed(date.today())
