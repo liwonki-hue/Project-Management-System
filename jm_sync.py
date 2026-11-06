@@ -89,7 +89,8 @@ def fetch_jm(system: str, unit: str) -> list:
     return r.json()
 
 
-def _build_records(entry, this_thu, this_wed, prev_wed, report_date_str):
+def _build_records(entry, ref_dates):
+    """ref_dates의 각 날짜가 속한 주(목~수)마다 진행 레코드를 만든다. 첫 번째가 이번 주."""
     activity_id, jm_system, jm_unit, ratio = entry
     joints = fetch_jm(jm_system, jm_unit)
 
@@ -97,26 +98,29 @@ def _build_records(entry, this_thu, this_wed, prev_wed, report_date_str):
     completed = [j for j in joints if j.get("date_completed")]
     start_date = min((j["date_completed"][:10] for j in completed), default=None)
 
-    raw_prev = sum(float(j.get("di") or 0) for j in completed if j["date_completed"][:10] <= prev_wed.isoformat())
-    raw_this = sum(float(j.get("di") or 0) for j in completed
-                   if this_thu.isoformat() <= j["date_completed"][:10] <= this_wed.isoformat())
+    prog_records = []
+    for d in ref_dates:
+        this_thu, this_wed, prev_wed = week_bounds_thu_wed(d)
+        raw_prev = sum(float(j.get("di") or 0) for j in completed if j["date_completed"][:10] <= prev_wed.isoformat())
+        raw_this = sum(float(j.get("di") or 0) for j in completed
+                       if this_thu.isoformat() <= j["date_completed"][:10] <= this_wed.isoformat())
+        # PostgREST 배치 upsert는 레코드마다 키 집합이 동일해야 하므로 actual_start도 항상 포함(없으면 null)
+        prog_records.append({
+            "activity_id":   activity_id,
+            "report_date":   this_wed.isoformat(),
+            "prev_week_qty": raw_prev * ratio,
+            "this_week_qty": raw_this * ratio,
+            "actual_start":  start_date,
+        })
 
-    total_di, prev_di, this_di = raw_total * ratio, raw_prev * ratio, raw_this * ratio
-
+    total_di = raw_total * ratio
     act_record = {"activity_id": activity_id, "budgeted_units": total_di, "unit_type": "DI"}
-    # PostgREST 배치 upsert는 레코드마다 키 집합이 동일해야 하므로 actual_start도 항상 포함(없으면 null)
-    prog_record = {
-        "activity_id":   activity_id,
-        "report_date":   report_date_str,
-        "prev_week_qty": prev_di,
-        "this_week_qty": this_di,
-        "actual_start":  start_date,
-    }
+    current = prog_records[0]
 
     return {
-        "activity_id": activity_id, "total_di": total_di, "prev_di": prev_di,
-        "this_di": this_di, "start_date": start_date,
-        "act_record": act_record, "prog_record": prog_record,
+        "activity_id": activity_id, "total_di": total_di, "prev_di": current["prev_week_qty"],
+        "this_di": current["this_week_qty"], "start_date": start_date,
+        "act_record": act_record, "prog_records": prog_records,
     }
 
 
@@ -128,19 +132,22 @@ def _upsert(table: str, records: list, on_conflict: str):
     r.raise_for_status()
 
 
-def sync(max_workers: int = 10) -> dict:
-    """활성 JM 매핑 전체를 동기화. 결과 레코드 리스트와 실패 목록을 반환한다."""
+def sync(max_workers: int = 10, ref_dates: Optional[list] = None) -> dict:
+    """활성 JM 매핑 전체를 동기화. 결과 레코드 리스트와 실패 목록을 반환한다.
+    기본은 이번 주와 지난주를 함께 갱신한다 — JM 입력은 완료일보다 늦게 들어오는 경우가 많고,
+    동기화는 페이지를 열 때만 돌기 때문에 이번 주만 갱신하면 지난주 실적이 비거나 덜 집계된 채 남는다."""
     mapping = load_mapping()
     if not mapping:
         return {"synced": 0, "failed": [], "results": []}
 
-    this_thu, this_wed, prev_wed = week_bounds_thu_wed(date.today())
-    report_date_str = this_wed.isoformat()
+    today = date.today()
+    ref_dates = ref_dates or [today, today - timedelta(days=7)]
+    report_date_str = week_bounds_thu_wed(ref_dates[0])[1].isoformat()
 
     results, failed = [], []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(_build_records, entry, this_thu, this_wed, prev_wed, report_date_str): entry[0]
+            executor.submit(_build_records, entry, ref_dates): entry[0]
             for entry in mapping
         }
         for fut in futures:
@@ -152,7 +159,7 @@ def sync(max_workers: int = 10) -> dict:
 
     if results:
         _upsert("activities", [r["act_record"] for r in results], on_conflict="activity_id")
-        _upsert("weekly_progress", [r["prog_record"] for r in results], on_conflict="activity_id,report_date")
+        _upsert("weekly_progress", [p for r in results for p in r["prog_records"]], on_conflict="activity_id,report_date")
 
     return {"synced": len(results), "failed": failed, "results": results, "report_date": report_date_str}
 
